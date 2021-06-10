@@ -4,6 +4,10 @@ import urllib3
 import csv
 import os
 import sys
+import redis
+import json
+from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.server import SimpleXMLRPCRequestHandler
 
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
@@ -27,30 +31,41 @@ class Master():
         self.TASK_ID=0
         self.WORKERS ={}
         self.WORKER_ID = 0
-        self.RESULTS = multiprocessing.Manager().dict()
-        self.RESULTS_CONT = 0
 
-    def start_worker(self):
+    def twitter_crawler_worker(self):
+        post = []
         while True:
-            user=self.redis_connection.rpop('queue:users')
-            if task:
-                task=json.loads(user)
-                if task:
-                    if not os.path.exists(str(user.id)):
-                        os.makedirs(str(user.id))
-                        f = open(str(user.id)+'/twitter.txt', 'a')
-                        writer = csv.writer(f)
-                        writer.writerow(header)
-                    user=api.get_user(userID)
-                    for info in api.user_timeline(screen_name=userID, count=200, include_rts = False, tweet_mode = 'extended'):
-                        status = api.get_status(info.id)
-                        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, info.id, info.created_at, info.full_text]
-                        writer.writerow(row)
-                    for favorite in tweepy.Cursor(api.favorites, id=userID).items(20):
-                        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, favorite.id, favorite.created_at, favorite.text]
-                        writer.writerow(row)
-                    f.close
-
+            screen_name=self.redis_connection.rpop('queue:users')
+            user=api.get_user(screen_name)
+            for info in api.user_timeline(screen_name=screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
+                status = api.get_status(info.id)
+                post.append()
+                self.redis_connection.rpush('queue:posts', json.dumps([result, id]))
+            for favorite in tweepy.Cursor(api.favorites, id=screen_name).items(20):
+            
+    
+    def preprocessing_worker(self):
+        while True:
+            if screen_name:
+                screen_name=json.loads(screen_name)
+                if screen_name:
+                    try:
+                        user=api.get_user(screen_name)
+                        if not os.path.exists(str(user.id)):
+                            os.makedirs(str(user.id))
+                            f = open(str(user.id)+'/twitter.txt', 'a')
+                            writer = csv.writer(f)
+                            writer.writerow(header)
+                        for info in api.user_timeline(screen_name=screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
+                            status = api.get_status(info.id)
+                            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, info.id, info.created_at, info.full_text]
+                            writer.writerow(row)
+                        for favorite in tweepy.Cursor(api.favorites, id=screen_name).items(20):
+                            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, favorite.id, favorite.created_at, favorite.text]
+                            writer.writerow(row)
+                        f.close
+                    except ValueError:
+                        print("user not found")
 
 def political_research(posts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
@@ -112,7 +127,24 @@ def religion_research(posts):
             if word in field:
                 budism_words_freq+=1
 
-    if democrat_words_freq>republican_words_freq:
-        return "democrat"
-    else:
-        return "republican"
+###falta adaptarlo, esta es la idea
+master=Master("localhost","6379")
+# Ceate server
+server=SimpleXMLRPCServer(('localhost', 9000),
+    requestHandler=RequestHandler,
+    logRequests=True,
+    allow_none=True)
+
+server.register_multicall_functions()
+server.register_introspection_functions
+server.register_instance(master)
+server.register_function(create_w, 'create_w')
+server.register_function(delete_w, 'delete_w')
+server.register_function(get_result, 'get_result')
+server.register_function(list_workers, 'list_workers')
+# Run the server's main loop
+try:
+    print('Use Control-C to exit')
+    server.serve_forever()
+except KeyboardInterrupt:
+    print('Exiting')
