@@ -10,6 +10,10 @@ import json
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 import ocs
+from lithops.storage import Storage
+from lithops.serverless import ServerlessHandler
+
+BUCKET_NAME='BUCKET'
 
 
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
@@ -31,7 +35,7 @@ config = {'lithops' : {'storage_bucket' : 'sd-task2'},
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
-
+ServerlessHandler.invoke
 def twitter_crawler_function(twitter_screen_name):
     posts=[]
     ###twitter requests
@@ -46,19 +50,26 @@ def facebook_crawler_function(facebook_token):
     field = ['name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
     profile = graph.get_object("me",fields=field)
 
-def twitter_preprocessing_function(self, posts):
+def twitter_preprocessing_function(posts):
     userID=posts[0].user.id
+    storage=Storage()
+    fexec = lithops.FunctionExecutor(config=config)
+    storage = fexec.storage
     while True:
         if not os.path.exists(str(userID)):
             os.makedirs(str(userID))
-            f = open(str(userID)+'/twitter.txt', 'a')
+            f = open(str(userID)+'/twitter.csv', 'a')
             writer = csv.writer(f)
             writer.writerow(header)
-            ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
         for info in posts:
             row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
             writer.writerow(row)
+            storage.put_cloudobject(f, BUCKET_NAME, None)
         f.close
+
+def sentimental_analysis_function():
+
+
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
 #     40-69 -->Medium
@@ -142,7 +153,7 @@ def religion_research(posts):
         return "neutral"
 
 def main(dict):
-    fexec = lithops.FunctionExecutor(config=config)
+    fexec = lithops.FunctionExecutor(config=config, backend='ibm_cf')
     twitter = fexec.call_async(twitter_crawler_function, dict.get("twitter"))
     facebook = fexec.call_async(facebook_crawler_function, dict.get("facebook"))
     
