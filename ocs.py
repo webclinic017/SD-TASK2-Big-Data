@@ -71,6 +71,3 @@ def get_item(bucket_name, item_name):
         print("File Contents: {0}".format(file["Body"].read()))
     except Exception as e:
         print("Unable to retrieve file contents: {0}".format(e))
-
-multi_part_upload('sd2practica','hola','hola.csv')
-get_item("sd2practica","hola")
