@@ -73,6 +73,46 @@ def political_research(posts):
 
     if democrat_words_freq>republican_words_freq:
         return "democrat"
+    if democrat_words_freq<republican_words_freq:
+        return "republican"
+    else:
+        return "neutral"
+
+def religion_research(posts):
+    islam_words = ["allah", "fatwa", "hadj", "hajj", "islam", "mecca", "muhammad", "mosque", "muslim", 
+        "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
+        "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
+        "zakat", "kaaba", "eid al-fitr", "eid al-adha", "p.b.u.h"]
+    catholic_words = ["apostle", "assembly", "bible", "blessed sacrament", "celebrant", "discernment", "disciple", 
+        "easter", "gospel", "eucharist", "grace", "communion", "holy water", "jesus", "christ", "new testament", "old testament",
+        "sacrament", "catholic", "christmas", "christian", "confession", "convent", "godparent", "immaculate", "pentateuch", "saint",
+        "prophet", "protestant", "church", "ecclesiastic", "episcopal"]
+    jewish_words = ["torah", "shalom", "kosher", "chutzpah", "kippah", "mazel tov", "adar", "achashverosh", "bimah",
+        "daven", "gelilah", "hakafot", "halachah", "iyar", "kiddish", "nisan", "nine day", "shmot", "shul", "simchat",
+        "vayikra", "yizkor", "zichrono livracha", "yerushalayim", "yisrael"]
+    budism_words = ["ajahn chah", "advaita vedanta", "ayya khema", "bhikkhu payutto", "buddha", "buddhism", "buddhist",
+        "chan", "chi kung", "dana", "dharma", "dhamma", "gelugpa", "jhana", "koan", "mahasi", "mahayana", "nibbana", 
+        "nirvana", "pali", "seva", "sanskrit", "zen"]
+
+    islam_words_freq=0
+    catholic_words_freq=0
+    jewish_words_freq=0
+    budism_words_freq=0
+    for field in posts:
+        for word in islam_words:
+            if word in field:
+                islam_words_freq+=1
+        for word in catholic_words:
+            if word in field:
+                catholic_words_freq+=1
+        for word in jewish_words:
+            if word in field:
+                jewish_words_freq+=1
+        for word in budism_words:
+            if word in field:
+                budism_words_freq+=1
+
+    if democrat_words_freq>republican_words_freq:
+        return "democrat"
     else:
         return "republican"
-
