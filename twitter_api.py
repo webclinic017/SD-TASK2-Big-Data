@@ -1,3 +1,4 @@
+import facebook
 import tweepy
 import lithops
 import urllib3
@@ -8,6 +9,8 @@ import redis
 import json
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
+import ocs
+
 
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
@@ -50,6 +53,7 @@ class Master():
                 f = open(str(userID)+'/twitter.txt', 'a')
                 writer = csv.writer(f)
                 writer.writerow(header)
+                ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
             for info in posts:
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
                 writer.writerow(row)
@@ -135,3 +139,11 @@ def religion_research(posts):
         return results.get(max(results))
     else:
         return "neutral"
+
+
+def dades_facebook(token):
+    graph = facebook.GraphAPI(token)
+    field = ['name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
+    profile = graph.get_object("me",fields=field)
+    print(profile)
+
