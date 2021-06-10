@@ -1,3 +1,4 @@
+import facebook
 import tweepy
 import lithops
 import urllib3
@@ -8,6 +9,8 @@ import redis
 import json
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
+import ocs
+
 
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
@@ -29,47 +32,33 @@ auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
 
-class Master():
+def twitter_crawler_function(twitter_screen_name):
+    posts=[]
+    ###twitter requests
+    user=api.get_user(twitter_screen_name)
+    for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
+        posts.append(post)
+    for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items(20):
+        posts.append(post)
 
-    def __init__(self,ip,port):
-        self.redis_connection=redis.Redis(
-            host=os.getenv("REDIS_HOST", ip),
-            port=os.getenv("REDIS_PORT", port),
-        )
-        self.TASKS={}
-        self.TASK_ID=0
-        self.WORKERS ={}
-        self.WORKER_ID = 0
+def facebook_crawler_function(facebook_token):
+    graph = facebook.GraphAPI(facebook_token)
+    field = ['name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
+    profile = graph.get_object("me",fields=field)
 
-    def crawler_worker(self, twitter_screen_name, facebook_id):
-        posts=[]
-        ###twitter requests
-        user=api.get_user(twitter_screen_name)
-        for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
-            posts.append(post)
-        for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items(20):
-            posts.append(post)
-                ###parte de facebook
-
-
-    def preprocessing_worker(self, posts):
-        userID=posts[0].user.id
-        while True:
-            if not os.path.exists(str(userID)):
-                os.makedirs(str(userID))
-                f = open(str(userID)+'/twitter.txt', 'a')
-                writer = csv.writer(f)
-                writer.writerow(header)
-            for info in posts:
-                row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
-                writer.writerow(row)
-            f.close
-        
-    def create_crawler_workers(self, twitter_screen_name, facebook_id):
-        with FunctionExecutor() as fexec:
-            posts = fexec.call_async(crawler_worker, twitter_screen_name, facebook_id)
-            print(posts.result())
-
+def twitter_preprocessing_function(self, posts):
+    userID=posts[0].user.id
+    while True:
+        if not os.path.exists(str(userID)):
+            os.makedirs(str(userID))
+            f = open(str(userID)+'/twitter.txt', 'a')
+            writer = csv.writer(f)
+            writer.writerow(header)
+            ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
+        for info in posts:
+            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+            writer.writerow(row)
+        f.close
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
 #     40-69 -->Medium
@@ -84,11 +73,12 @@ class Master():
 def profile_security_research(post):
     score=0
     if(post[3] is not ""): score+=5           #location
-    if(post[6] is not "neutral"): score+=40
-    if(post[7] is not "neutral"): score+=40
+    if(post[6] is not "neutral"): score+=40   #politic
+    if(post[7] is not "neutral"): score+=40   #religion
     if(post[8] is not "True"): score+=10      #public profile
     if((post[9] is not "False") and (post[10] is not "False") and (post[11] is not "False")): score+=90     #geo enabled and the position is visible
     return score
+
 def political_research(posts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
@@ -151,7 +141,11 @@ def religion_research(posts):
     else:
         return "neutral"
 
-if __name__ == '__main__':
+def main(dict):
     fexec = lithops.FunctionExecutor(config=config)
-    fexec.call_async(hello_world, 'World')
-    print(fexec.get_result())
+    twitter = fexec.call_async(twitter_crawler_function, dict.get("twitter"))
+    facebook = fexec.call_async(facebook_crawler_function, dict.get("facebook"))
+    
+    fexec.call_async(twitter_preprocessing_function, twitter)
+    fexec.call_async(facebook_preprocessing_function, twitter)
+
