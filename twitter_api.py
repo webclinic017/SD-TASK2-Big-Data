@@ -43,8 +43,21 @@ def twitter_crawler_function(twitter_screen_name):
 
 def facebook_crawler_function(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
-    field = ['name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
+    field = ['id,name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
     profile = graph.get_object("me",fields=field)
+    if not os.path.exists(profile['id']):
+            os.makedirs(str(userID))
+            f = open(str(userID)+'/facebool.txt', 'a')
+            writer = csv.writer(f)
+            writer.writerow(header)
+            ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
+       for post in profile['posts']['data']:
+        if post.get('message'):
+            row=["null", profile['name'], info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+            writer.writerow(row)
+        f.close
+        
+
 
 def twitter_preprocessing_function(self, posts):
     userID=posts[0].user.id
@@ -149,3 +162,4 @@ def main(dict):
     fexec.call_async(twitter_preprocessing_function, twitter)
     fexec.call_async(facebook_preprocessing_function, twitter)
 
+facebook_crawler_function('EAAUSOutv7HkBAObyH1ZCsT8phDxECifvg8j5pxJQ4ARwPWYYjECo3Y529sU91v3r0obrv5diWRsr1aKgzNgykJanTZBNHbtxLrKFmKpI6kOh5Whimfx68FZCUCFYisCHJwHUZAe5nHQZA9bgSbKULlWEFdaXwrpPaPAgNc5ZBZBlrWESUbPMiFxkbhRpVZBDiEQuC7XL7iZAFfgZDZD')
