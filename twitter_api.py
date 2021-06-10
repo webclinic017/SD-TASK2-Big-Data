@@ -1,5 +1,5 @@
 import tweepy
-import lithops
+from lithops import FunctionExecutor
 import urllib3
 import csv
 import os
@@ -15,6 +15,15 @@ twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
 userID = "usama12_usama"
 header = ['user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
+
+config = {'lithops' : {'storage_bucket' : 'sd-task2'},
+
+          'ibm_cf':  {'endpoint': 'https://eu-gb.functions.cloud.ibm.com',
+                      'namespace': 'ubenabdelkrim2@gmail.com_dev',
+                      'api_key': '7c45d3db-a61f-4ca6-afdd-45d749ebbda3:9Z1CfSBEeif85med0hgE9pefPC8KI6vrrCanErdmMKiajaMKKzfOd57TBQKF4E9I'},
+
+          'ibm_cos': {'region': 'United Kingdom',
+                      'api_key': 'bf6FU-NbvCzPSVlfqmur8njE4yKyaVYQHcNvWYhwPEXh'}}
 
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
@@ -32,15 +41,16 @@ class Master():
         self.WORKERS ={}
         self.WORKER_ID = 0
 
-    def twitter_crawler_worker(self, twitter_screen_name, facebook_id):
-        post=[]
+    def crawler_worker(self, twitter_screen_name, facebook_id):
+        posts=[]
         ###twitter requests
         user=api.get_user(twitter_screen_name)
         for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
-            post.append(post)
+            posts.append(post)
         for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items(20):
-            post.append(post)
+            posts.append(post)
                 ###parte de facebook
+
 
     def preprocessing_worker(self, posts):
         userID=posts[0].user.id
@@ -54,6 +64,11 @@ class Master():
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
                 writer.writerow(row)
             f.close
+        
+    def create_crawler_workers(self, twitter_screen_name, facebook_id):
+        with FunctionExecutor() as fexec:
+            posts = fexec.call_async(crawler_worker, twitter_screen_name, facebook_id)
+            print(fut.result())
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -91,9 +106,9 @@ def political_research(posts):
         for word in republicans_words:
             if word in field:
                 republican_words_freq+=1
-    if democrat_words_freq>republican_words_freq:
+    if democrat_words_freq-4>republican_words_freq:
         return "democrat"
-    if democrat_words_freq<republican_words_freq:
+    if democrat_words_freq-4<republican_words_freq:
         return "republican"
     else:
         return "neutral"
@@ -135,3 +150,6 @@ def religion_research(posts):
         return results.get(max(results))
     else:
         return "neutral"
+
+
+#main
