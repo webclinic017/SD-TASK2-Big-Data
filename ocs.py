@@ -11,6 +11,7 @@ credentials = {
     'IAM_SERVICE_ID': 'crn:v1:bluemix:public:cloud-object-storage:global:a/8765512ed8dc43c39cea994b03da5dba:9cae809b-4257-4e46-8130-87d98501e35f::',
     'ENDPOINT': 'https://s3.eu-de.cloud-object-storage.appdomain.cloud',
     'IBM_AUTH_ENDPOINT': 'https://iam.cloud.ibm.com/identity/token',
+    'BUCKET': 'sd2practica',
 }
 
 cos_cli = ibm_boto3.resource(service_name='s3',
@@ -71,3 +72,4 @@ def get_item(bucket_name, item_name):
         print("File Contents: {0}".format(file["Body"].read()))
     except Exception as e:
         print("Unable to retrieve file contents: {0}".format(e))
+
