@@ -15,32 +15,42 @@ header = ['user_name', 'name', 'account_created_at', 'location', 'URL', 'sentime
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
-user=api.get_user(userID)
 
-if not os.path.exists(str(user.id)):
-    os.makedirs(str(user.id))
-f = open(str(user.id)+'/twitter.txt', 'a')
-writer = csv.writer(f)
-writer.writerow(header)
+class Master():
 
-tweets = api.user_timeline(screen_name=userID, 
-                           # 200 is the maximum allowed count
-                           count=200,
-                           include_rts = False,
-                           # Necessary to keep full_text 
-                           # otherwise only the first 140 words are extracted
-                           tweet_mode = 'extended'
-                           )
+    def __init__(self,ip,port):
+        self.redis_connection=redis.Redis(
+            host=os.getenv("REDIS_HOST", ip),
+            port=os.getenv("REDIS_PORT", port),
+        )
+        self.TASKS={}
+        self.TASK_ID=0
+        self.WORKERS ={}
+        self.WORKER_ID = 0
+        self.RESULTS = multiprocessing.Manager().dict()
+        self.RESULTS_CONT = 0
 
-for info in tweets:
-    status = api.get_status(info.id)
-    row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, info.id, info.created_at, info.full_text]
-    writer.writerow(row)
-for favorite in tweepy.Cursor(api.favorites, id=userID).items(20):
-    row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, favorite.id, favorite.created_at, favorite.text]
-    writer.writerow(row)
+    def start_worker(self):
+        while True:
+            user=self.redis_connection.rpop('queue:users')
+            if task:
+                task=json.loads(user)
+                if task:
+                    if not os.path.exists(str(user.id)):
+                        os.makedirs(str(user.id))
+                        f = open(str(user.id)+'/twitter.txt', 'a')
+                        writer = csv.writer(f)
+                        writer.writerow(header)
+                    user=api.get_user(userID)
+                    for info in api.user_timeline(screen_name=userID, count=200, include_rts = False, tweet_mode = 'extended'):
+                        status = api.get_status(info.id)
+                        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, info.id, info.created_at, info.full_text]
+                        writer.writerow(row)
+                    for favorite in tweepy.Cursor(api.favorites, id=userID).items(20):
+                        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', info.user.protected, info.user.geo_enabled, info.user.description, favorite.id, favorite.created_at, favorite.text]
+                        writer.writerow(row)
+                    f.close
 
-f.close
 
 def political_research(posts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
@@ -65,3 +75,4 @@ def political_research(posts):
         return "democrat"
     else:
         return "republican"
+
