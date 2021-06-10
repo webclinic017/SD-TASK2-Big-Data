@@ -1,5 +1,5 @@
 import tweepy
-from lithops import FunctionExecutor
+import lithops
 import urllib3
 import csv
 import os
@@ -68,7 +68,7 @@ class Master():
     def create_crawler_workers(self, twitter_screen_name, facebook_id):
         with FunctionExecutor() as fexec:
             posts = fexec.call_async(crawler_worker, twitter_screen_name, facebook_id)
-            print(fut.result())
+            print(posts.result())
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -151,5 +151,7 @@ def religion_research(posts):
     else:
         return "neutral"
 
-
-#main
+if __name__ == '__main__':
+    fexec = lithops.FunctionExecutor(config=config)
+    fexec.call_async(hello_world, 'World')
+    print(fexec.get_result())
