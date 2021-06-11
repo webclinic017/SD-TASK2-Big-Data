@@ -18,10 +18,6 @@
           xfbml      : true,
           version    : 'v2.8'
         });
-
-        FB.getLoginStatus(function(response) {
-            statusChangeCallback(response);
-        });
       };
 
       (function(d, s, id){
@@ -43,89 +39,6 @@
            setElements(false);
          }
        }
-
-      function checkLoginState() {
-        FB.getLoginStatus(function(response) {
-          statusChangeCallback(response);
-        });
-      }
-
-      function testAPI(){
-        FB.api('/me?fields=name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts', function(response){
-          if(response && !response.error){
-            //console.log(response);
-            buildProfile(response);
-            buildFeed(response);
-          }
-
-         
-        })
-      }
-
-      function buildProfile(user){
-        let profile = `
-          <h3>${user.name}</h3>
-          <ul class="list-group">
-            <li class="list-group-item">User ID: ${user.id}</li>
-            <li class="list-group-item">Email: ${user.email}</li>
-            <li class="list-group-item">Birthday: ${user.birthday}</li>
-            <li class="list-group-item">User ID: ${user.location.name}</li>
-            <li class="list-group-item">User gender: ${user.gender}</li>
-            <li class="list-group-item">User hometown: ${user.hometown.name}</li>
-            <li class="list-group-item">User age range: ${user.age_range.min}</li>
-            <li class="list-group-item">User edu: ${user.education}</li>
-            <li class="list-group-item">User languages: ${user.languages}</li>
-            <li class="list-group-item">User political view: ${user.political}</li>
-            <li class="list-group-item">User religion: ${user.religion}</li>
-
-
-
-
-
-
-
-          </ul>
-        `;
-
-        document.getElementById('profile').innerHTML = profile;
-      }
-
-      function buildFeed(user){
-        let output = '<h3>Latest Posts</h3>';
-        for(let i in user.posts.data){
-          if(user.posts.data[i].message){
-            output += `
-              <div class="well">
-                ${user.posts.data[i].message} <span>${user.posts.data[i].created_time}</span>
-              </div>
-            `;
-          }
-        }
-
-        document.getElementById('feed').innerHTML = output;
-      }
-
-      function setElements(isLoggedIn){
-        if(isLoggedIn){
-          document.getElementById('logout').style.display = 'block';
-          document.getElementById('profile').style.display = 'block';
-          document.getElementById('feed').style.display = 'block';
-          document.getElementById('fb-btn').style.display = 'none';
-          document.getElementById('heading').style.display = 'none';
-        } else {
-          document.getElementById('logout').style.display = 'none';
-          document.getElementById('profile').style.display = 'none';
-          document.getElementById('feed').style.display = 'none';
-          document.getElementById('fb-btn').style.display = 'block';
-          document.getElementById('heading').style.display = 'block';
-        }
-      }
-
-      function logout(){
-        FB.logout(function(response){
-          setElements(false);
-        });
-      }
     </script>
 
     <nav class="navbar navbar-default">
@@ -136,7 +49,6 @@
             <li><a href="index.html">Home</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right"></ul>
-          <a id="logout" href="#" onclick="logout()">Logout</a>
           <fb:login-button
           id="fb-btn"
           scope="public_profile,email,user_birthday,user_location,user_posts"
