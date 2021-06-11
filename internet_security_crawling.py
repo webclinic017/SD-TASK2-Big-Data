@@ -41,7 +41,6 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 def twitter_crawler_function(twitter_screen_name):
-    open("hola.txt", "w")
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
@@ -93,6 +92,7 @@ def check_create_dir(path):
         f = open(path, 'a')
         writer = csv.writer(f)
         writer.writerow(header)
+
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
 #     40-69 -->Medium
@@ -177,14 +177,11 @@ def religion_research(posts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
-    print(request.args.get('fname'))
-    print(request.args.get('tname'))
     userID = uuid.uuid4()
     init_path = str(userID)
-    fexec = lithops.FunctionExecutor(backend='ibm_cf')
-    #twitter = fexec.call_async(twitter_crawler_function, twitter_username)
-    #facebook = fexec.call_async(facebook_crawler_function, facebook_token)
+    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom-runtime-3.9:0.1')
     fexec.call_async(twitter_preprocessing_function, request.args.get('tname'))
+    fexec.call_async(twitter_preprocessing_function, request.args.get('fname'))
     return "1"
 
 if __name__ == '__main__':
