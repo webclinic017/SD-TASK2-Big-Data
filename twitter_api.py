@@ -20,8 +20,9 @@ twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
+
 userID = "usama12_usama"
-header = ['user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
+header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
 
 config = {'lithops' : {'storage_bucket' : 'sd-task2'},
 
@@ -29,7 +30,7 @@ config = {'lithops' : {'storage_bucket' : 'sd-task2'},
                       'namespace': 'ubenabdelkrim2@gmail.com_dev',
                       'api_key': '7c45d3db-a61f-4ca6-afdd-45d749ebbda3:9Z1CfSBEeif85med0hgE9pefPC8KI6vrrCanErdmMKiajaMKKzfOd57TBQKF4E9I'},
 
-          'ibm_cos': {'region': 'United Kingdom',
+          'ibm_cos': {'region': 'eu-de',
                       'api_key': 'bf6FU-NbvCzPSVlfqmur8njE4yKyaVYQHcNvWYhwPEXh'}}
 
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
@@ -38,51 +39,52 @@ api = tweepy.API(auth)
 ServerlessHandler.invoke
 def twitter_crawler_function(twitter_screen_name):
     posts=[]
-    ###twitter requests
-    user=api.get_user(twitter_screen_name)
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
         posts.append(post)
     for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items(20):
         posts.append(post)
+    twitter_preprocessing_function(posts)
 
 def facebook_crawler_function(facebook_token):
+    storage=Storage()
+    fexec = lithops.FunctionExecutor(config=config)
     graph = facebook.GraphAPI(facebook_token)
-    field = ['id,name,email,birthday,location,gender,hometown,age_range,education,languages,political,religion,posts']
+    field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,languages,political,religion,posts']
     profile = graph.get_object("me",fields=field)
-    if not os.path.exists(profile['id']):
-            os.makedirs(str(userID))
-            f = open(str(userID)+'/facebool.txt', 'a')
-            writer = csv.writer(f)
-            writer.writerow(header)
-            ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
-       for post in profile['posts']['data']:
+
+    path=str(userID)+'/facebook.csv'
+    f = open(path, 'a')
+    writer = csv.writer(f)
+    check_create_dir(path)
+    for post in profile['posts']['data']:
         if post.get('message'):
-            row=["null", profile['name'], info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+            row=[profile['id'], profile['name'], ' ', profile['location'], profile['link'], ' ', ' ', ' ', ' ', ' ', ' ', ' ', profile['id'],' ', post.get('message')]
             writer.writerow(row)
-        f.close
+    f.close
+    storage.put_cloudobject(f, BUCKET_NAME, None)
         
-
-
 def twitter_preprocessing_function(posts):
     userID=posts[0].user.id
     storage=Storage()
     fexec = lithops.FunctionExecutor(config=config)
     storage = fexec.storage
-    while True:
-        if not os.path.exists(str(userID)):
-            os.makedirs(str(userID))
-            f = open(str(userID)+'/twitter.csv', 'a')
-            writer = csv.writer(f)
-            writer.writerow(header)
-        for info in posts:
-            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
-            writer.writerow(row)
-            storage.put_cloudobject(f, BUCKET_NAME, None)
-        f.close
 
-def sentimental_analysis_function():
+    path=str(userID)+'/twitter.csv'
+    f = open(path, 'a')
+    writer = csv.writer(f)
+    check_create_dir(str(userID)+'/twitter.csv')
+    for info in posts:
+        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+        writer.writerow(row)
+    f.close
+    storage.put_cloudobject(f, BUCKET_NAME, None)
 
-
+def check_create_dir(path):
+    if not os.path.exists(str(userID)):
+        os.makedirs(str(userID))
+        f = open(path, 'a')
+        writer = csv.writer(f)
+        writer.writerow(header)
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
 #     40-69 -->Medium
@@ -173,4 +175,5 @@ def main(dict):
     fexec.call_async(twitter_preprocessing_function, twitter)
     fexec.call_async(facebook_preprocessing_function, twitter)
 
-facebook_crawler_function('EAAUSOutv7HkBAObyH1ZCsT8phDxECifvg8j5pxJQ4ARwPWYYjECo3Y529sU91v3r0obrv5diWRsr1aKgzNgykJanTZBNHbtxLrKFmKpI6kOh5Whimfx68FZCUCFYisCHJwHUZAe5nHQZA9bgSbKULlWEFdaXwrpPaPAgNc5ZBZBlrWESUbPMiFxkbhRpVZBDiEQuC7XL7iZAFfgZDZD')
+#facebook_crawler_function('EAACTYqyk4wIBAD4dn2H3lCh7jjBbqRqbLQoqfjlNx3Fgt1vkLDEBWqQ2cshpLXnkWBp0jXmijjgkZBhnt5mHfCDfKxh03RVkxj4hJayYCv4cQPoamENCToU0wJGQ5RkGmUTTMq2ZCcZAIZBA45mtMcSMz9MZA7JkKs5GepRm7jWxC2eedV3xRTvrmMJCJykFvAsnbLITvaB3ZC8XZBTTjDj05kfXo98POjx9YIWITQQtkhHDN5ZClK8F')
+twitter_crawler_function(userID)
