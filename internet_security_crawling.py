@@ -14,7 +14,8 @@ from lithops.serverless import ServerlessHandler
 import io
 from hashlib import md5
 import uuid
-from flask import Flask, render_template
+from flask import Flask, render_template, request
+
 
 BUCKET_NAME='sd-task2'
 
@@ -29,14 +30,6 @@ userID = uuid.uuid4()
 init_path = str(userID)
 
 header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
-config = {'lithops' : {'storage_bucket' : 'task2'},
-
-          'ibm_cf':  {'endpoint': 'https://eu-gb.functions.cloud.ibm.com',
-                      'namespace': 'ubenabdelkrim2@gmail.com_dev',
-                      'api_key': '7c45d3db-a61f-4ca6-afdd-45d749ebbda3:9Z1CfSBEeif85med0hgE9pefPC8KI6vrrCanErdmMKiajaMKKzfOd57TBQKF4E9I'},
-
-          'ibm_cos': {'region': 'eu-de',
-                      'api_key': '0kMJ2L_MVSZCLz7TdXmUG8I6S2ofCMsK2BUcgTVVDPSa'}}
 
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
@@ -48,6 +41,7 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 def twitter_crawler_function(twitter_screen_name):
+    open("hola.txt", "w")
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
@@ -58,10 +52,10 @@ def twitter_crawler_function(twitter_screen_name):
 def facebook_crawler_function(facebook_token):
     data={}
     storage=Storage()
-    fexec = lithops.FunctionExecutor(config=config)
+    fexec = lithops.FunctionExecutor()
     storage = fexec.storage
     graph = facebook.GraphAPI(facebook_token)
-    field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,languages,political,religion,posts']
+    field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object("me",fields=field)
 
     path=init_path+'/facebook.csv'
@@ -77,7 +71,7 @@ def facebook_crawler_function(facebook_token):
 def twitter_preprocessing_function(posts):
     username=posts[0].user.id
     storage=Storage()
-    fexec = lithops.FunctionExecutor(config=config)
+    fexec = lithops.FunctionExecutor()
     storage = fexec.storage
 
     path=init_path+'/twitter.csv'
@@ -182,16 +176,16 @@ def religion_research(posts):
         return "neutral"
 
 @app.route('/do_security_analysis')
-def do_security_analysis(dict):
-    print("holaaaaaaaaaaa")
-    fexec = lithops.FunctionExecutor(config=config, backend='ibm_cf')
-    twitter = fexec.call_async(twitter_crawler_function, dict.get("twitter"))
-    facebook = fexec.call_async(facebook_crawler_function, dict.get("facebook"))
-    
-    fexec.call_async(twitter_preprocessing_function, twitter)
-
-    facebook_crawler_function('EAAUSOutv7HkBAC36MBmCCVaPQlP9RZA0jBSiS9Ug1NhokcTZBBtB3D8dvMRsdiL9CBpv7JSYxwx06Ks1ZClv7SFfVmQLFjhLbW1hMKZBKDcM2NaK6TeBmUZB3stiJly6nkuikCuANVtGLb8ZBuxJzkyixFmeggM75geM68LaCSb5RYhpY6qGtV0IjrbdEfV6ZBOKQPoTdeBv6q1i9d1NGsaVj0Y46faX7squZBZAM6E5U5ZANpJgRt3o8i')
-    twitter_crawler_function(username)
+def do_security_analysis():
+    print(request.args.get('fname'))
+    print(request.args.get('tname'))
+    userID = uuid.uuid4()
+    init_path = str(userID)
+    fexec = lithops.FunctionExecutor(backend='ibm_cf')
+    #twitter = fexec.call_async(twitter_crawler_function, twitter_username)
+    #facebook = fexec.call_async(facebook_crawler_function, facebook_token)
+    fexec.call_async(twitter_preprocessing_function, request.args.get('tname'))
+    return "1"
 
 if __name__ == '__main__':
   app.run(debug=True)  

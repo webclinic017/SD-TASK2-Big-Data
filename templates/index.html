@@ -13,7 +13,7 @@
     <script>
       window.fbAsyncInit = function() {
         FB.init({
-          appId      : '1427419150937209',
+          appId      : '974914599931938',
           cookie     : true,
           xfbml      : true,
           version    : 'v2.8'
@@ -35,8 +35,7 @@
        function statusChangeCallback(response){
          if(response.status === 'connected'){
            console.log('Logged in and authenticated');
-           var access_token =   FB.getAuthResponse()['accessToken'];
-           console.log('Access Token = '+ access_token);
+           document.getElementById("fname").value =   FB.getAuthResponse()['accessToken'];
            setElements(true);
            testAPI();
          } else {
@@ -137,19 +136,18 @@
             <li><a href="index.html">Home</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right"></ul>
-            <a id="logout" href="#" onclick="logout()">Logout</a>
-              <fb:login-button
-              id="fb-btn"
-              scope="public_profile,email,user_birthday,user_location,user_posts"
-              onlogin="checkLoginState();">
-            </fb:login-button>
-            <form action="/">
-              <label for="fname">@username:</label><br>
-              <input type="text" id="fname" name="fname"><br>
-              <form action="/do_security_analysis">
-                <button name="submit" type="submit">Submit</button>
-            </form>
-            </form> 
+          <a id="logout" href="#" onclick="logout()">Logout</a>
+          <fb:login-button
+          id="fb-btn"
+          scope="public_profile,email,user_birthday,user_location,user_posts"
+          onlogin="checkLoginState();">
+        </fb:login-button >
+          <form action="/do_security_analysis">
+            <input name="fname" type="hidden" id="fname" value=""/>
+            <label for="tname">@username:</label><br>
+            <input type="text" id="tname" name="tname"><br>
+            <button name="submit" type="submit">Submit</button>
+          </form> 
           </ul>
         </div><!--/.nav-collapse -->
       </div>
@@ -162,12 +160,6 @@
     </div>
     
   </body>
-
-  <script type="text/javascript">
-    function get_twitter_field() {
-      var twitter_input = document.getElementsByName('fname')
-    }
-  </script>
-
 </script>
+
 </html>
