@@ -51,11 +51,10 @@ def facebook_crawler_function(facebook_token):
             writer = csv.writer(f)
             writer.writerow(header)
             ocs.multi_part_upload(ocs.credentials.get('BUCKET'),str(userID),str(userID)+'.csv')
-       for post in profile['posts']['data']:
+    for post in profile['posts']['data']:
         if post.get('message'):
-            row=["null", profile['name'], info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.status.geo, info.status.coordinates, info.user.description, info.id, info.created_at, info.full_text]
-            writer.writerow(row)
-        f.close
+            print(profile)
+    f.close
         
 
 
@@ -162,4 +161,4 @@ def main(dict):
     fexec.call_async(twitter_preprocessing_function, twitter)
     fexec.call_async(facebook_preprocessing_function, twitter)
 
-facebook_crawler_function('EAAUSOutv7HkBAObyH1ZCsT8phDxECifvg8j5pxJQ4ARwPWYYjECo3Y529sU91v3r0obrv5diWRsr1aKgzNgykJanTZBNHbtxLrKFmKpI6kOh5Whimfx68FZCUCFYisCHJwHUZAe5nHQZA9bgSbKULlWEFdaXwrpPaPAgNc5ZBZBlrWESUbPMiFxkbhRpVZBDiEQuC7XL7iZAFfgZDZD')
+facebook_crawler_function('EAAUSOutv7HkBAPtOuIqz1Cl9z9ipTa2mYyMmhoyVpUOM1kSFp457l9LUsn8kh77hCPqLRYo9mZCnzFaA3ev5xPr1xG0srqCK5ryPZCBICzUxGvKdHyhjXGU6DKezVjHqZCVibxAbLmlW93ZCtSbpsangwD3IDhe2BJcTiXv9Qdvwd0LWnZAxCBOjgm5CBAoOUvr9ZCd8nqcrYoCD1Tr0bhsSXoBP5Cd3tk4hZAfSEtD5WPuZC1fdA04U')
