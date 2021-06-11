@@ -1,0 +1,23 @@
+lithops:
+
+    storage_bucket: sd-task2
+
+
+
+ibm_cf:
+
+    endpoint : https://eu-gb.functions.cloud.ibm.com
+
+    namespace   : ubenabdelkrim2@gmail.com_dev
+
+    api_key     : 7c45d3db-a61f-4ca6-afdd-45d749ebbda3:9Z1CfSBEeif85med0hgE9pefPC8KI6vrrCanErdmMKiajaMKKzfOd57TBQKF4E9I
+
+
+
+ibm_cos:
+
+    region   : eu-de
+
+    access_key : 5286a241e5de460a96de29466c635424
+
+    secret_key : 1e4c0eaec93783aab1243240ffe8f0d90dbae5def4c9aeae
