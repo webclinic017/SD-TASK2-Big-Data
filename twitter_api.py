@@ -12,6 +12,7 @@ from xmlrpc.server import SimpleXMLRPCRequestHandler
 import ocs
 from lithops.storage import Storage
 from lithops.serverless import ServerlessHandler
+import io
 
 BUCKET_NAME='BUCKET'
 
@@ -39,13 +40,14 @@ api = tweepy.API(auth)
 ServerlessHandler.invoke
 def twitter_crawler_function(twitter_screen_name):
     posts=[]
-    for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = True, tweet_mode = 'extended'):
+    for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
     for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items(20):
         posts.append(post)
     twitter_preprocessing_function(posts)
 
 def facebook_crawler_function(facebook_token):
+    data={}
     storage=Storage()
     fexec = lithops.FunctionExecutor(config=config)
     graph = facebook.GraphAPI(facebook_token)
@@ -53,16 +55,15 @@ def facebook_crawler_function(facebook_token):
     profile = graph.get_object("me",fields=field)
 
     path=str(userID)+'/facebook.csv'
-    f = open(path, 'a')
-    writer = csv.writer(f)
-    check_create_dir(path)
-    for post in profile['posts']['data']:
-        if post.get('message'):
-            row=[profile['id'], profile['name'], ' ', profile['location'], profile['link'], ' ', ' ', ' ', ' ', ' ', ' ', ' ', profile['id'],' ', post.get('message')]
-            writer.writerow(row)
-    f.close
-    storage.put_cloudobject(f, BUCKET_NAME, None)
-        
+    with open(path, 'a', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        check_create_dir(path)
+        for post in profile['posts']['data']:
+            if post.get('message'):
+                row=["null", profile['name'], " ", profile['location'], profile['link'], 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'], "null", post.get('message')]
+                writer.writerow(row)
+    storage.put_cloudobject(BUCKET_NAME, None, csv_to_json(storage, f))
+
 def twitter_preprocessing_function(posts):
     userID=posts[0].user.id
     storage=Storage()
@@ -70,14 +71,28 @@ def twitter_preprocessing_function(posts):
     storage = fexec.storage
 
     path=str(userID)+'/twitter.csv'
-    f = open(path, 'a')
-    writer = csv.writer(f)
-    check_create_dir(str(userID)+'/twitter.csv')
-    for info in posts:
-        row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
-        writer.writerow(row)
-    f.close
-    storage.put_cloudobject(f, BUCKET_NAME, None)
+    with open(path, 'a', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        check_create_dir(path)
+        for info in posts:
+            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+            writer.writerow(row)
+    storage.put_cloudobject(BUCKET_NAME, None, csv_to_json(storage, f))
+
+def csv_to_json(storage, f):
+    data={}
+    csvReader = csv.DictReader(f)
+    i=0
+    for row in csvReader:
+        key=row[i]
+        i+=1
+        data[key]=row
+    with open(str(userID)+'/facebook.json', 'w', encoding='utf-8') as jsonf:
+        jsonf.write(json.dumps(data, indent=4))
+    storage.put_cloudobject(BUCKET_NAME, None, data)
+    f.close()
+    return jsonf
+
 
 def check_create_dir(path):
     if not os.path.exists(str(userID)):
@@ -175,5 +190,5 @@ def main(dict):
     fexec.call_async(twitter_preprocessing_function, twitter)
     fexec.call_async(facebook_preprocessing_function, twitter)
 
-#facebook_crawler_function('EAACTYqyk4wIBAD4dn2H3lCh7jjBbqRqbLQoqfjlNx3Fgt1vkLDEBWqQ2cshpLXnkWBp0jXmijjgkZBhnt5mHfCDfKxh03RVkxj4hJayYCv4cQPoamENCToU0wJGQ5RkGmUTTMq2ZCcZAIZBA45mtMcSMz9MZA7JkKs5GepRm7jWxC2eedV3xRTvrmMJCJykFvAsnbLITvaB3ZC8XZBTTjDj05kfXo98POjx9YIWITQQtkhHDN5ZClK8F')
+#facebook_crawler_function('EAAUSOutv7HkBAPtOuIqz1Cl9z9ipTa2mYyMmhoyVpUOM1kSFp457l9LUsn8kh77hCPqLRYo9mZCnzFaA3ev5xPr1xG0srqCK5ryPZCBICzUxGvKdHyhjXGU6DKezVjHqZCVibxAbLmlW93ZCtSbpsangwD3IDhe2BJcTiXv9Qdvwd0LWnZAxCBOjgm5CBAoOUvr9ZCd8nqcrYoCD1Tr0bhsSXoBP5Cd3tk4hZAfSEtD5WPuZC1fdA04U')
 twitter_crawler_function(userID)
