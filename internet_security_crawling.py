@@ -47,33 +47,38 @@ def facebook_crawler_processing_function(facebook_token, init_path, storage):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object(id="me",fields=field)
-    
+    posts2 = []
 
     path=init_path+'/facebook.csv'
-    check_create_dir(init_path,"/facebook.csv")
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
         for post in profile['posts']['data']:
             if post.get('message'):
-                row=["null", profile['name'].replace(',', ''), " ", profile['location'].replace(',', ''), profile['link'].replace(',', ''), 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'].replace(',', ''), "null", post.get('message').replace(',', '')]
-                rows_split=[]
-                for r in row:
-                    rows_split.append(str(r).replace(',', " "))
-                if(len(rows_split) > 14):
-                    fields_to_analyze = [rows_split[12], rows_split[15]]
-                    political_pred = political_research(fields_to_analyze)
-                    religion_pred = religion_research(fields_to_analyze)
-                    rows_split[5]=political_pred
-                    rows_split[5]=religion_pred
-                writer.writerow(rows_split)
+                row=["null", profile['name'], " ", profile['location'], profile['link'], 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'], "null", post.get('message')]
+            rows_split=[]
+            for field in row:
+                rows_split.append(str(field).replace(',', " "))
+            posts2.append(rows_split)
+
+        with open(path, 'w', encoding='utf-8') as f:    
+            writer = csv.writer(f)
+            fexec.call_async(political_research, posts2)
+            political_pred = fexec.get_result()
+            fexec.call_async(religion_research, posts2)
+            religion_pred = fexec.get_result()
+            for post in posts2:
+                if(len(post) > 14):
+                    post[5] = political_pred
+                    post[6] = religion_pred
+                writer.writerow(post)
 
     with open(path, 'r', encoding='utf8') as csvfile:
         text = csvfile.read()
-        storage.put_cloudobject(text, BUCKET_NAME, path)
+        csv_id = storage.put_cloudobject(text, BUCKET_NAME, path)
+    return csv_id
 
 def twitter_preprocessing_function(posts, init_path, storage):
     path=init_path+"/twitter.csv"
-    check_create_dir(init_path,"/twitter.csv")
     posts2 = []
     
     for info in posts:
@@ -86,18 +91,18 @@ def twitter_preprocessing_function(posts, init_path, storage):
             rows_split.append(str(field).replace(',', " "))
         posts2.append(rows_split)
     
-    with open(path, 'w', encoding='utf-8') as f:    
+    with open(path, 'r+', encoding='utf-8') as f:    
         writer = csv.writer(f)
-        political_pred = political_research(posts2)
-        religion_pred = religion_research(posts2)
+        fexec.call_async(political_research, posts2)
+        political_pred = fexec.get_result()
+        fexec.call_async(religion_research, posts2)
+        religion_pred = fexec.get_result()
         for post in posts2:
             if(len(post) > 14):
                 post[5] = political_pred
                 post[6] = religion_pred
             writer.writerow(post)
-
-    with open(path, 'r', encoding='utf8') as csvfile:
-        text = csvfile.read()
+        text = f.read()
         csv_id = storage.put_cloudobject(text, BUCKET_NAME, path)
     return csv_id
 
@@ -111,17 +116,18 @@ def check_create_dir(path, media):
         f.close()
       
       
-def do_predictions(dir_path, csv_id, storage):
+def do_predictions(dir_path, tcsv_id, fcsv_id, storage):
     score = 0
-    #facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
-    twitter_csv = storage.get_cloudobject(csv_id)
-    #facebook_csv = facebook_csv.decode()
+    facebook_csv = storage.get_cloudobject(fcsv_id)
+    twitter_csv = storage.get_cloudobject(tcsv_id)
+    facebook_csv = facebook_csv.decode()
     twitter_csv = twitter_csv.decode()
     i=0
     valid_post=False
     posts = twitter_csv.split('\n')
+    posts.extend(facebook_csv.split('\n'))
     post = ""
-    while(i<len(posts)  and valid_post is False):
+    while(i<len(posts) and valid_post is False):
         if(posts[i] != ' ' and posts[i] != '' and i != 0):
             post = posts[i]
             if(len(post) > 14):
@@ -234,17 +240,19 @@ def do_security_analysis():
     registred_users = {}
     #avatar = request.args.get('avatar')
     avatar="usipiton"
-    storage=Storage()
     if(avatar in registred_users.keys()):
         init_path = registred_users.get(avatar)
     else:
         init_path = registred_users[avatar] = str(uuid.uuid4())
     
-    posts = twitter_crawler_function(request.args.get('tname'), init_path, storage)
-    csv_id = twitter_preprocessing_function(posts, init_path, storage)
-    #facebook_crawler_processing_function(request.args.get('fname'), init_path)
-    score = do_predictions(init_path, csv_id, storage)
-    return str(score)
+    fexec.call_async(twitter_crawler_function, (request.args.get('tname'), init_path))
+    posts = fexec.get_result()
+    fexec.call_async(twitter_preprocessing_function, (posts, init_path))
+    tcsv_id = fexec.get_result()
+    fexec.call_async(facebook_crawler_processing_function, (request.args.get('fname'), init_path))
+    fcsv_id = fexec.get_result()
+    fexec.call_async(do_predictions, (init_path, tcsv_id, fcsv_id))
+    return str(fexec.get_result())
 
 if __name__ == '__main__':
   app.run(debug=True)  
