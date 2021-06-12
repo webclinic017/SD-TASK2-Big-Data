@@ -50,8 +50,9 @@ def facebook_crawler_processing_function(facebook_token, init_path, storage):
     profile = graph.get_object(id="me",fields=field)
     jsonfile = open("file.json", "w")
     
-    
-    path=init_path+'/facebook.csv'
+ 
+
+    path=init_path+'/file.json'
     check_create_dir(path)
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -63,9 +64,8 @@ def facebook_crawler_processing_function(facebook_token, init_path, storage):
         storage.put_cloudobject("hola", BUCKET_NAME, path)
 
 def twitter_preprocessing_function(posts, init_path, storage):
-    path=init_path+'/twitter.csv'
-    jsonfile = open("file.json", "w")
-    check_create_dir(path)
+    path=init_path+"/file.json"
+    check_create_dir(init_path)
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
         for info in posts:
@@ -74,21 +74,22 @@ def twitter_preprocessing_function(posts, init_path, storage):
             except:
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
             writer.writerow(row)
-            json.dump(row, jsonfile)
-        storage.put_cloudobject("hola", BUCKET_NAME, path)
+        storage.put_cloudobject(open(path, "rb"), BUCKET_NAME, path)
 
 def check_create_dir(path):
     header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
     if not os.path.exists(path):
         if not os.path.exists(path):
             os.makedirs(str(path))
-        f = open(path, 'a')
+        
+        f = open(path+"/file.json", 'a')
         writer = csv.writer(f)
-        writer.writerow(header)
-
+        writer.writerow(header) 
+      
+      
 def do_predictions(dir_path, storage):
     #facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
-    twitter_csv = storage.get_cloudobject(dir_path+'/twitter.csv')
+    twitter_csv = storage.get_cloudobject(str(dir_path+'/file.json'))
     #facebook_csv = facebook_csv.decode()
     twitter_csv = twitter_csv.decode()
 
@@ -185,7 +186,7 @@ def do_security_analysis():
         init_path = registred_users.get(avatar)
     else:
         init_path = registred_users[avatar] = str(uuid.uuid4())
-
+    
     twitter_crawler_function(request.args.get('tname'), init_path, storage)
     #facebook_crawler_processing_function(request.args.get('fname'), init_path)
     do_predictions(init_path, storage)
