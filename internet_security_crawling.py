@@ -89,7 +89,7 @@ def check_create_dir(path):
         writer.writerow(header)
 
 def do_predictions(dir_path):
-    None
+    facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
  
 
 ### Vulnerability Scoring (CVSS Score):
@@ -168,7 +168,7 @@ def religion_research(posts):
         for word in budism_words:
             if word in field:
                 budism_words_freq+=1
-        results=[catholic_words, islam_words_freq, jewish_words, budism_words]
+    results=[catholic_words, islam_words_freq, jewish_words, budism_words]
     if max(results)>0:
         return results.get(max(results))
     else:
@@ -184,7 +184,7 @@ def do_security_analysis():
 
     twitter_crawler_function(request.args.get('tname'))
     facebook_crawler_processing_function(request.args.get('fname'))
-    fexec.call_async(do_predictions, str(userID))
+    #fexec.call_async(do_predictions, str(userID))
     return "1"
 
 if __name__ == '__main__':
