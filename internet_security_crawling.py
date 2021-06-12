@@ -76,7 +76,8 @@ def facebook_crawler_processing_function(facebook_token, init_path, storage):
 def twitter_preprocessing_function(posts, init_path, storage):
     path=init_path+"/twitter.csv"
     check_create_dir(init_path,"/twitter.csv")
-    
+    rows_split=[]
+
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
         for info in posts:
@@ -84,12 +85,11 @@ def twitter_preprocessing_function(posts, init_path, storage):
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
             except:
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
-            rows_split=[]
             for r in row:
                 rows_split.append(str(r).replace(',', " "))
             writer.writerow(rows_split)
     posts = []
-    with open(path, 'a', encoding='utf-8') as f:
+    with open(path, 'r', encoding='utf-8') as f:
         for line in f:
             posts.append(line.split(','))
             
