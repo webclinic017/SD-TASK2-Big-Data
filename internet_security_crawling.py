@@ -15,6 +15,7 @@ import io
 from hashlib import md5
 import uuid
 from flask import Flask, render_template, request
+import pandas
 
 
 BUCKET_NAME='sd-task2'
@@ -41,31 +42,32 @@ def twitter_crawler_function(twitter_screen_name, init_path, storage):
         posts.append(post)
     for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items():
         posts.append(post)
-    twitter_preprocessing_function(posts, init_path, storage)
+    return twitter_preprocessing_function(posts, init_path, storage)
 
 def facebook_crawler_processing_function(facebook_token, init_path, storage):
     data={}
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object(id="me",fields=field)
-    jsonfile = open("file.json", "w")
     
- 
 
-    path=init_path+'/file.json'
-    check_create_dir(path)
+    path=init_path+'/facebook.csv'
+    check_create_dir(init_path,"/facebook.csv")
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
         for post in profile['posts']['data']:
             if post.get('message'):
                 row=["null", profile['name'], " ", profile['location'], profile['link'], 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'], "null", post.get('message')]
                 writer.writerow(row)
-                json.dump(row, jsonfile)
-        storage.put_cloudobject("hola", BUCKET_NAME, path)
+
+    with open(path, 'r', encoding='utf8') as csvfile:
+        text = csvfile.read()
+        storage.put_cloudobject(text, BUCKET_NAME, path)
 
 def twitter_preprocessing_function(posts, init_path, storage):
-    path=init_path+"/file.json"
-    check_create_dir(init_path)
+    path=init_path+"/twitter.csv"
+    check_create_dir(init_path,"/twitter.csv")
+    
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
         for info in posts:
@@ -74,22 +76,25 @@ def twitter_preprocessing_function(posts, init_path, storage):
             except:
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
             writer.writerow(row)
-        storage.put_cloudobject(open(path, "rb"), BUCKET_NAME, path)
 
-def check_create_dir(path):
+    with open(path, 'r', encoding='utf8') as csvfile:
+        text = csvfile.read()
+        csv_id = storage.put_cloudobject(text, BUCKET_NAME, path)
+    return csv_id
+
+def check_create_dir(path, media):
     header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
     if not os.path.exists(path):
-        if not os.path.exists(path):
-            os.makedirs(str(path))
-        
-        f = open(path+"/file.json", 'a')
+        os.mkdir(path)
+        f = open(path+media, 'a')
         writer = csv.writer(f)
-        writer.writerow(header) 
+        writer.writerow(header)
+        f.close()
       
       
-def do_predictions(dir_path, storage):
+def do_predictions(dir_path, csv_id, storage):
     #facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
-    twitter_csv = storage.get_cloudobject(str(dir_path+'/file.json'))
+    twitter_csv = storage.get_cloudobject(csv_id)
     #facebook_csv = facebook_csv.decode()
     twitter_csv = twitter_csv.decode()
 
@@ -187,9 +192,9 @@ def do_security_analysis():
     else:
         init_path = registred_users[avatar] = str(uuid.uuid4())
     
-    twitter_crawler_function(request.args.get('tname'), init_path, storage)
+    csv_id = twitter_crawler_function(request.args.get('tname'), init_path, storage)
     #facebook_crawler_processing_function(request.args.get('fname'), init_path)
-    do_predictions(init_path, storage)
+    do_predictions(init_path, csv_id, storage)
     return "1"
 
 if __name__ == '__main__':
