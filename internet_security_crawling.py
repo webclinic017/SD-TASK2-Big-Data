@@ -19,44 +19,38 @@ from flask import Flask, render_template, request
 
 BUCKET_NAME='sd-task2'
 
-
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
-
-registred_users={}
-userID = uuid.uuid4()
-init_path = str(userID)
-
-header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
 
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
 
 fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
-storage=Storage()
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     return render_template('index.html')
-def twitter_crawler_function(twitter_screen_name):
+def twitter_crawler_function(twitter_screen_name, init_path, storage):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
     for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items():
         posts.append(post)
-    twitter_preprocessing_function(posts)
+    twitter_preprocessing_function(posts, init_path, storage)
 
-def facebook_crawler_processing_function(facebook_token):
+def facebook_crawler_processing_function(facebook_token, init_path, storage):
     data={}
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object(id="me",fields=field)
-
+    jsonfile = open("file.json", "w")
+    
+    
     path=init_path+'/facebook.csv'
     check_create_dir(path)
     with open(path, 'a', encoding='utf-8') as f:
@@ -65,10 +59,12 @@ def facebook_crawler_processing_function(facebook_token):
             if post.get('message'):
                 row=["null", profile['name'], " ", profile['location'], profile['link'], 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'], "null", post.get('message')]
                 writer.writerow(row)
-        storage.put_cloudobject(open(path, "rb"), BUCKET_NAME, path)
+                json.dump(row, jsonfile)
+        storage.put_cloudobject("hola", BUCKET_NAME, path)
 
-def twitter_preprocessing_function(posts):
+def twitter_preprocessing_function(posts, init_path, storage):
     path=init_path+'/twitter.csv'
+    jsonfile = open("file.json", "w")
     check_create_dir(path)
     with open(path, 'a', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -78,19 +74,24 @@ def twitter_preprocessing_function(posts):
             except:
                 row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
             writer.writerow(row)
-        storage.put_cloudobject(open(path, "rb"), BUCKET_NAME, path)
+            json.dump(row, jsonfile)
+        storage.put_cloudobject("hola", BUCKET_NAME, path)
 
 def check_create_dir(path):
+    header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
     if not os.path.exists(path):
-        if not os.path.exists(init_path):
-            os.makedirs(str(init_path))
+        if not os.path.exists(path):
+            os.makedirs(str(path))
         f = open(path, 'a')
         writer = csv.writer(f)
         writer.writerow(header)
 
-def do_predictions(dir_path):
-    facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
- 
+def do_predictions(dir_path, storage):
+    #facebook_csv = storage.get_cloudobject(dir_path+'/facebook.csv')
+    twitter_csv = storage.get_cloudobject(dir_path+'/twitter.csv')
+    #facebook_csv = facebook_csv.decode()
+    twitter_csv = twitter_csv.decode()
+
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -176,15 +177,18 @@ def religion_research(posts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
-    avatar = request.args.get('avatar')
+    registred_users = {}
+    #avatar = request.args.get('avatar')
+    avatar="usipiton"
+    storage=Storage()
     if(avatar in registred_users.keys()):
-        registred_users.get(avatar)
+        init_path = registred_users.get(avatar)
     else:
-        registred_users[avatar] = uuid.uuid4()
+        init_path = registred_users[avatar] = str(uuid.uuid4())
 
-    twitter_crawler_function(request.args.get('tname'))
-    facebook_crawler_processing_function(request.args.get('fname'))
-    #fexec.call_async(do_predictions, str(userID))
+    twitter_crawler_function(request.args.get('tname'), init_path, storage)
+    #facebook_crawler_processing_function(request.args.get('fname'), init_path)
+    do_predictions(init_path, storage)
     return "1"
 
 if __name__ == '__main__':
