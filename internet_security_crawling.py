@@ -40,8 +40,6 @@ def twitter_crawler_function(twitter_screen_name, init_path, storage):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
-    for post in tweepy.Cursor(api.favorites, id=twitter_screen_name).items():
-        posts.append(post)
     return posts
 
 def facebook_crawler_processing_function(facebook_token, init_path, storage):
@@ -76,27 +74,27 @@ def facebook_crawler_processing_function(facebook_token, init_path, storage):
 def twitter_preprocessing_function(posts, init_path, storage):
     path=init_path+"/twitter.csv"
     check_create_dir(init_path,"/twitter.csv")
-    rows_split=[]
-
-    with open(path, 'a', encoding='utf-8') as f:
+    posts2 = []
+    
+    for info in posts:
+        try:
+            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+        except:
+            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
+        rows_split=[]
+        for field in row:
+            rows_split.append(str(field).replace(',', " "))
+        posts2.append(rows_split)
+    
+    with open(path, 'w', encoding='utf-8') as f:    
         writer = csv.writer(f)
-        for info in posts:
-            try:
-                row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
-            except:
-                row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
-            for r in row:
-                rows_split.append(str(r).replace(',', " "))
-            writer.writerow(rows_split)
-    posts = []
-    with open(path, 'r', encoding='utf-8') as f:
-        for line in f:
-            posts.append(line.split(','))
-            
-    political_pred = political_research(posts)
-    religion_pred = religion_research(posts)
-    rows_split[5] = political_pred
-    rows_split[6] = religion_pred
+        political_pred = political_research(posts2)
+        religion_pred = religion_research(posts2)
+        for post in posts2:
+            if(len(post) > 14):
+                post[5] = political_pred
+                post[6] = religion_pred
+            writer.writerow(post)
 
     with open(path, 'r', encoding='utf8') as csvfile:
         text = csvfile.read()
@@ -122,6 +120,7 @@ def do_predictions(dir_path, csv_id, storage):
     i=0
     valid_post=False
     posts = twitter_csv.split('\n')
+    post = ""
     while(i<len(posts)  and valid_post is False):
         if(posts[i] != ' ' and posts[i] != '' and i != 0):
             post = posts[i]
@@ -146,15 +145,17 @@ def do_predictions(dir_path, csv_id, storage):
 def profile_security_research(post):
     score=0
     #print(len(post[3]))
-    if(len(post[3]) > 0 ): score+=5           #location
-    if(post[7] !=  "True"): score+=10      #public profile
-    if((post[8] != "False") and (post[9] != "None") and (post[10] != "None")): score+=90     #geo enabled and the position is visible
+    if(len(post) > 14):
+        if(len(post[3]) > 0 ): score+=5           #location
+        if(post[7] !=  "True"): score+=10      #public profile
+        if((post[8] != "False") and (post[9] != "None") and (post[10] != "None")): score+=90     #geo enabled and the position is visible
     return score
 
 def prediction_analysis(post):
     score = 0
-    if(post[5] != "neutral"): score+=40   #politic
-    if(post[6] != "neutral"): score+=40   #religion
+    if(len(post) > 14):
+        if(post[5] != "neutral"): score+=40   #politic
+        if(post[6] != "neutral"): score+=40   #religion
     return score
 
 def political_research(posts):
@@ -183,10 +184,10 @@ def political_research(posts):
         return "neutral"
 
 def religion_research(posts):
-    islam_words = ["allah", "fatwa", "hadj", "hajj", "islam", "mecca", "muhammad", "mosque", "muslim", 
+    islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah" "islam", "mecca", "muhammad", "mosque", "muslim", 
         "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
         "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
-        "zakat", "kaaba", "eid al fitr", "eid al adha", "p.b.u.h"]
+        "zakat", "kaaba", "eid al fitr","khutbah", "eid al adha", "p.b.u.h"]
     catholic_words = ["apostle", "assembly", "bible", "blessed sacrament", "celebrant", "discernment", "disciple", 
         "easter", "gospel", "eucharist", "grace", "communion", "holy water", "jesus", "christ", "new testament", "old testament",
         "sacrament", "catholic", "christmas", "christian", "confession", "convent", "godparent", "immaculate", "pentateuch", "saint",
@@ -203,23 +204,25 @@ def religion_research(posts):
     budism_words_freq=0
     for post in posts:
         if(len(post) > 14):
+            descr = post[11].lower()
+            post_text = post[14].lower()
             for word in islam_words:
-                if(word in post[11] or word in post[14]):
+                if(word in descr or word in post_text):
                     islam_words_freq+=1
             for word in catholic_words:
-                if(word in post[11] or word in post[14]):
+                if(word in descr or word in post_text):
                     catholic_words_freq+=1
             for word in jewish_words:
-                if(word in post[11] or word in post[14]):
+                if(word in descr or word in post_text):
                     jewish_words_freq+=1
             for word in budism_words:
-                if(word in post[11] or word in post[14]):
+                if(word in descr or word in post_text):
                     budism_words_freq+=1
     results={}
-    results["catholic_words"]=catholic_words_freq
-    results["islam_words"]=islam_words_freq
-    results["jewish_words"]=jewish_words_freq
-    results["budism_words"]=budism_words_freq
+    results["catholic"]=catholic_words_freq
+    results["islam"]=islam_words_freq
+    results["jewish"]=jewish_words_freq
+    results["budism"]=budism_words_freq
     max_value=max(results.items(), key=operator.itemgetter(1))[0]
     if (results.get(max_value) > 0):
         return max_value
