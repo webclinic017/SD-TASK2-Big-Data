@@ -3,7 +3,6 @@
   <head>
     <meta charset="utf-8">
     <title>SocialAuth</title>
-    <link rel="stylesheet" href="http://bootswatch.com/darkly/bootstrap.min.css">
     <style media="screen">
       #fb-btn{margin-top:20px;}
       #profile, #logout, #feed{display:none}
@@ -13,10 +12,13 @@
     <script>
       window.fbAsyncInit = function() {
         FB.init({
-          appId      : '709670296506352',
+          appId      : '1427419150937209',
           cookie     : true,
           xfbml      : true,
           version    : 'v2.8'
+        });
+        FB.getLoginStatus(function(response) {
+            statusChangeCallback(response);
         });
       };
 
@@ -31,16 +33,23 @@
        function statusChangeCallback(response){
          if(response.status === 'connected'){
            console.log('Logged in and authenticated');
-           document.getElementById("fname").value =   FB.getAuthResponse()['accessToken'];
-           setElements(true);
-           testAPI();
+           document.getElementById("fname").value =  FB.getAuthResponse()['accessToken'];
+           console.log( FB.getAuthResponse()['accessToken']);
          } else {
            console.log('Not authenticated');
-           setElements(false);
          }
        }
+
+
+       function checkLoginState() {
+        FB.getLoginStatus(function(response) {
+          statusChangeCallback(response);
+        });
+      }
     </script>
 
+
+    
     <nav class="navbar navbar-default">
       <div class="container">
 
@@ -51,11 +60,11 @@
           <ul class="nav navbar-nav navbar-right"></ul>
           <fb:login-button
           id="fb-btn"
-          scope="public_profile,email,user_birthday,user_location,user_posts"
-          onlogin="checkLoginState();">
+          onlogin="checkLoginState();"
+          scope="public_profile,email,user_birthday,user_location,user_posts">
         </fb:login-button >
           <form action="/do_security_analysis">
-            <input name="fname" type="hidden" id="fname" value=""/>
+            <input name="fname" type="text" id="fname" value=""/>
             <label for="tname">@username:</label><br>
             <input type="text" id="tname" name="tname"><br>
             <button name="submit" type="submit">Submit</button>
