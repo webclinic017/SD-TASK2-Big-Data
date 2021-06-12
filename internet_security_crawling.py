@@ -25,7 +25,7 @@ twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
 
-username = "usama12_usama"
+registred_users={}
 userID = uuid.uuid4()
 init_path = str(userID)
 
@@ -34,6 +34,9 @@ header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'p
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
+
+fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
+storage=Storage()
 
 app = Flask(__name__)
 
@@ -48,14 +51,11 @@ def twitter_crawler_function(twitter_screen_name):
         posts.append(post)
     twitter_preprocessing_function(posts)
 
-def facebook_crawler_function(facebook_token):
+def facebook_crawler_processing_function(facebook_token):
     data={}
-    storage=Storage()
-    fexec = lithops.FunctionExecutor()
-    storage = fexec.storage
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
-    profile = graph.get_object("me",fields=field)
+    profile = graph.get_object(id="me",fields=field)
 
     path=init_path+'/facebook.csv'
     check_create_dir(path)
@@ -68,11 +68,6 @@ def facebook_crawler_function(facebook_token):
         storage.put_cloudobject(open(path, "rb"), BUCKET_NAME, path)
 
 def twitter_preprocessing_function(posts):
-    username=posts[0].user.id
-    storage=Storage()
-    fexec = lithops.FunctionExecutor()
-    storage = fexec.storage
-
     path=init_path+'/twitter.csv'
     check_create_dir(path)
     with open(path, 'a', encoding='utf-8') as f:
@@ -93,6 +88,10 @@ def check_create_dir(path):
         writer = csv.writer(f)
         writer.writerow(header)
 
+def do_predictions(dir_path):
+    None
+ 
+
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
 #     40-69 -->Medium
@@ -110,7 +109,7 @@ def profile_security_research(post):
     if(post[6] is not "neutral"): score+=40   #politic
     if(post[7] is not "neutral"): score+=40   #religion
     if(post[8] is not "True"): score+=10      #public profile
-    if((post[9] is not "False") and (post[10] is not "False") and (post[11] is not "False")): score+=90     #geo enabled and the position is visible
+    if((post[9] is not "False" or "null") and (post[10] is not "False" or "null") and (post[11] is not "False" or "null")): score+=90     #geo enabled and the position is visible
     return score
 
 def political_research(posts):
@@ -177,11 +176,15 @@ def religion_research(posts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
-    userID = uuid.uuid4()
-    init_path = str(userID)
-    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom-runtime-3.9:0.1')
-    fexec.call_async(twitter_preprocessing_function, request.args.get('tname'))
-    fexec.call_async(twitter_preprocessing_function, request.args.get('fname'))
+    avatar = request.args.get('avatar')
+    if(avatar in registred_users.keys()):
+        registred_users.get(avatar)
+    else:
+        registred_users[avatar] = uuid.uuid4()
+
+    twitter_crawler_function(request.args.get('tname'))
+    facebook_crawler_processing_function(request.args.get('fname'))
+    fexec.call_async(do_predictions, str(userID))
     return "1"
 
 if __name__ == '__main__':
