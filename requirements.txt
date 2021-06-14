@@ -54,4 +54,5 @@ lithops
 urllib3
 uuid
 operator
+io
 
