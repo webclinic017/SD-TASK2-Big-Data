@@ -25,6 +25,8 @@ twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
 
+header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
+
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
@@ -43,71 +45,51 @@ def twitter_crawler_function(twitter_screen_name, init_path, storage):
     return posts
 
 def facebook_crawler_processing_function(facebook_token, init_path, storage):
-    data={}
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object(id="me",fields=field)
-    posts2 = []
-
+    posts_dict={}
     path=init_path+'/facebook.csv'
-    with open(path, 'a', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        for post in profile['posts']['data']:
-            if post.get('message'):
-                row=["null", profile['name'], " ", profile['location'], profile['link'], 'null', 'null', 'null', 'null', 'null', 'null', 'null', profile['id'], "null", post.get('message')]
-            rows_split=[]
-            for field in row:
-                rows_split.append(str(field).replace(',', " "))
-            posts2.append(rows_split)
+    for post in profile['posts']['data']:
+        if post.get('message'):
+            row=["null", str(profile['name']).replace(',', " "), " ", str(profile['location']).replace(',', " "), str(profile['link']).replace(',', " "), 'null', 'null', 'null', 'null', 
+            'null', 'null', 'null', str(profile['id']).replace(',', " "), "null", str(post.get('message').replace(',', " "))]
 
-        with open(path, 'w', encoding='utf-8') as f:    
-            writer = csv.writer(f)
-            fexec.call_async(political_research, posts2)
-            political_pred = fexec.get_result()
-            fexec.call_async(religion_research, posts2)
-            religion_pred = fexec.get_result()
-            for post in posts2:
-                if(len(post) > 14):
-                    post[5] = political_pred
-                    post[6] = religion_pred
-                writer.writerow(post)
-
-    with open(path, 'r', encoding='utf8') as csvfile:
-        text = csvfile.read()
-        csv_id = storage.put_cloudobject(text, BUCKET_NAME, path)
+    csv_id = storage.put_cloudobject(do_predictions(posts_dict).encode('utf8'), BUCKET_NAME, path)
     return csv_id
 
 def twitter_preprocessing_function(posts, init_path, storage):
     path=init_path+"/twitter.csv"
-    posts2 = []
-    
-    for info in posts:
+    posts_dict={}
+    for info, column_name in zip(posts, header):
         try:
-            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.full_text]
+            row=[str(info.user.screen_name).replace(',', " "), str(info.user.name).replace(',', " "), str(info.user.created_at).replace(',', " "), str(info.user.location).replace(',', " "), 
+            str('https://twitter.com/'+info.user.screen_name).replace(',', " "), ' ', ' ', str(info.user.protected).replace(',', " "), str(info.user.geo_enabled).replace(',', " "), 
+            str(info.geo).replace(',', " "), str(info.coordinates).replace(',', " "), str(info.user.description).replace(',', " "), str(info.id).replace(',', " "), str(info.created_at).replace(',', " "), 
+            str(info.full_text.replace(',', " "))]
         except:
-            row=[info.user.screen_name, info.user.name, info.user.created_at, info.user.location, 'https://twitter.com/'+info.user.screen_name, ' ', ' ', info.user.protected, info.user.geo_enabled, info.geo, info.coordinates, info.user.description, info.id, info.created_at, info.text]
-        rows_split=[]
-        for field in row:
-            rows_split.append(str(field).replace(',', " "))
-        posts2.append(rows_split)
+            row=[str(info.user.screen_name).replace(',', " "), str(info.user.name).replace(',', " "), str(info.user.created_at).replace(',', " "), str(info.user.location).replace(',', " "), 
+            str('https://twitter.com/'+info.user.screen_name).replace(',', " "), ' ', ' ', str(info.user.protected).replace(',', " "), str(info.user.geo_enabled).replace(',', " "), 
+            str(info.geo).replace(',', " "), str(info.coordinates).replace(',', " "), str(info.user.description).replace(',', " "), str(info.id).replace(',', " "), str(info.created_at).replace(',', " "), 
+            str(info.text.replace(',', " "))]
+        posts_dict[column_name] = row
     
-    with open(path, 'r+', encoding='utf-8') as f:    
-        writer = csv.writer(f)
-        fexec.call_async(political_research, posts2)
-        political_pred = fexec.get_result()
-        fexec.call_async(religion_research, posts2)
-        religion_pred = fexec.get_result()
-        for post in posts2:
-            if(len(post) > 14):
-                post[5] = political_pred
-                post[6] = religion_pred
-            writer.writerow(post)
-        text = f.read()
-        csv_id = storage.put_cloudobject(text, BUCKET_NAME, path)
+    csv_id = storage.put_cloudobject(do_predictions(posts_dict).encode('utf8'), BUCKET_NAME, path)
     return csv_id
 
+def do_predictions(posts_dict):
+    political_pred = political_analysis(posts_dict.values())
+    religion_pred = religion_analysis(posts_dict.values())
+    output = io.StringIO()
+    w = csv.DictWriter(output, posts_dict.keys())
+    for post in posts_dict.values():
+        if(len(post) > 14):
+            post[5] = political_pred
+            post[6] = religion_pred
+    w.writerow(posts_dict)
+    return output.getvalue()
+
 def check_create_dir(path, media):
-    header = ['id', 'user_name', 'name', 'account_created_at', 'location', 'URL', 'political_analysis', 'religion_analysis', 'protected', 'geo_enabled ', 'geo', 'coordinates', 'description', 'post_id', 'post_created_at', 'post_text']
     if not os.path.exists(path):
         os.mkdir(path)
         f = open(path+media, 'a')
@@ -116,7 +98,7 @@ def check_create_dir(path, media):
         f.close()
       
       
-def do_predictions(dir_path, tcsv_id, fcsv_id, storage):
+def total_scoring(dir_path, tcsv_id, fcsv_id, storage):
     score = 0
     facebook_csv = storage.get_cloudobject(fcsv_id)
     twitter_csv = storage.get_cloudobject(tcsv_id)
@@ -133,8 +115,8 @@ def do_predictions(dir_path, tcsv_id, fcsv_id, storage):
             if(len(post) > 14):
                 valid_post=True
         i+=1
-    score+=profile_security_research(post.split(','))
-    score+=prediction_analysis(post.split(','))
+    score+=profile_scoring(post.split(','))
+    score+=predictions_scoring(post.split(','))
     return score
 
 ### Vulnerability Scoring (CVSS Score):
@@ -148,7 +130,7 @@ def do_predictions(dir_path, tcsv_id, fcsv_id, storage):
 #     location-->+5 points
 #     political idelogy != neutral-->+40 points
 #     religion ideology not neutral-->+40 points
-def profile_security_research(post):
+def profile_scoring(post):
     score=0
     #print(len(post[3]))
     if(len(post) > 14):
@@ -157,14 +139,14 @@ def profile_security_research(post):
         if((post[8] != "False") and (post[9] != "None") and (post[10] != "None")): score+=90     #geo enabled and the position is visible
     return score
 
-def prediction_analysis(post):
+def predictions_scoring(post):
     score = 0
     if(len(post) > 14):
         if(post[5] != "neutral"): score+=40   #politic
         if(post[6] != "neutral"): score+=40   #religion
     return score
 
-def political_research(posts):
+def political_analysis(posts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
         "bin laden", "wall street", "worker", "veteran", "fight", "invest", "education", "military", "war", "medicare", "science", 
@@ -189,7 +171,7 @@ def political_research(posts):
     else:
         return "neutral"
 
-def religion_research(posts):
+def religion_analysis(posts):
     islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah" "islam", "mecca", "muhammad", "mosque", "muslim", 
         "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
         "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
@@ -240,19 +222,18 @@ def do_security_analysis():
     registred_users = {}
     #avatar = request.args.get('avatar')
     avatar="usipiton"
+    storage = Storage()
     if(avatar in registred_users.keys()):
         init_path = registred_users.get(avatar)
     else:
         init_path = registred_users[avatar] = str(uuid.uuid4())
     
     fexec.call_async(twitter_crawler_function, (request.args.get('tname'), init_path))
-    posts = fexec.get_result()
-    fexec.call_async(twitter_preprocessing_function, (posts, init_path))
-    tcsv_id = fexec.get_result()
+    fexec.call_async(twitter_preprocessing_function, (fexec.get_result, init_path,))
+    tcsv_id = fexec.get_result
     fexec.call_async(facebook_crawler_processing_function, (request.args.get('fname'), init_path))
-    fcsv_id = fexec.get_result()
-    fexec.call_async(do_predictions, (init_path, tcsv_id, fcsv_id))
-    return str(fexec.get_result())
+    fexec.call_async(do_predictions, (init_path, tcsv_id, fexec.get_result))
+    return str(fexec.get_result)
 
 if __name__ == '__main__':
   app.run(debug=True)  
