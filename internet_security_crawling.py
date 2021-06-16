@@ -16,6 +16,7 @@ from hashlib import md5
 import uuid
 from flask import Flask, render_template, request
 import operator
+from dask.utils import SerializableLock
 
 
 BUCKET_NAME='sd-task2'
@@ -32,50 +33,44 @@ auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth) 
 
 fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
-
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     return render_template('index.html')
-def twitter_crawler_function(twitter_screen_name, init_path, storage):
+def twitter_crawler_function(twitter_screen_name, storage):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
     return posts
 
-def facebook_crawler_processing_function(facebook_token, init_path, storage):
+def facebook_crawler_processing_function(facebook_token, storage):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,email,birthday,link,location,gender,hometown,age_range,education,political,religion,posts']
     profile = graph.get_object(id="me",fields=field)
     posts_dict={}
-    path=init_path+'/facebook.csv'
+    row = []
     for post in profile['posts']['data']:
         if post.get('message'):
             row=["null", str(profile['name']).replace(',', " "), " ", str(profile['location']).replace(',', " "), str(profile['link']).replace(',', " "), 'null', 'null', 'null', 'null', 
             'null', 'null', 'null', str(profile['id']).replace(',', " "), "null", str(post.get('message').replace(',', " "))]
 
-    csv_id = storage.put_cloudobject(do_predictions(posts_dict).encode('utf8'), BUCKET_NAME, path)
-    return csv_id
+    return row
 
-def twitter_preprocessing_function(posts, init_path, storage):
-    path=init_path+"/twitter.csv"
-    posts_dict={}
-    for info, column_name in zip(posts, header):
-        try:
-            row=[str(info.user.screen_name).replace(',', " "), str(info.user.name).replace(',', " "), str(info.user.created_at).replace(',', " "), str(info.user.location).replace(',', " "), 
-            str('https://twitter.com/'+info.user.screen_name).replace(',', " "), ' ', ' ', str(info.user.protected).replace(',', " "), str(info.user.geo_enabled).replace(',', " "), 
-            str(info.geo).replace(',', " "), str(info.coordinates).replace(',', " "), str(info.user.description).replace(',', " "), str(info.id).replace(',', " "), str(info.created_at).replace(',', " "), 
-            str(info.full_text.replace(',', " "))]
-        except:
-            row=[str(info.user.screen_name).replace(',', " "), str(info.user.name).replace(',', " "), str(info.user.created_at).replace(',', " "), str(info.user.location).replace(',', " "), 
-            str('https://twitter.com/'+info.user.screen_name).replace(',', " "), ' ', ' ', str(info.user.protected).replace(',', " "), str(info.user.geo_enabled).replace(',', " "), 
-            str(info.geo).replace(',', " "), str(info.coordinates).replace(',', " "), str(info.user.description).replace(',', " "), str(info.id).replace(',', " "), str(info.created_at).replace(',', " "), 
-            str(info.text.replace(',', " "))]
-        posts_dict[column_name] = row
+def twitter_preprocessing_function(post, storage):
+    row = []
+    try:
+        row=[str(post.user.screen_name).replace(',', " "), str(post.user.name).replace(',', " "), str(post.user.created_at).replace(',', " "), str(post.user.location).replace(',', " "), 
+        str('https://twitter.com/'+post.user.screen_name).replace(',', " "), ' ', ' ', str(post.user.protected).replace(',', " "), str(post.user.geo_enabled).replace(',', " "), 
+        str(post.geo).replace(',', " "), str(post.coordinates).replace(',', " "), str(post.user.description).replace(',', " "), str(post.id).replace(',', " "), str(post.created_at).replace(',', " "), 
+        str(post.full_text.replace(',', " "))]
+    except:
+        row=[str(post.user.screen_name).replace(',', " "), str(post.user.name).replace(',', " "), str(post.user.created_at).replace(',', " "), str(post.user.location).replace(',', " "), 
+        str('https://twitter.com/'+post.user.screen_name).replace(',', " "), ' ', ' ', str(post.user.protected).replace(',', " "), str(post.user.geo_enabled).replace(',', " "), 
+        str(post.geo).replace(',', " "), str(post.coordinates).replace(',', " "), str(post.user.description).replace(',', " "), str(post.id).replace(',', " "), str(post.created_at).replace(',', " "), 
+        str(post.text.replace(',', " "))]
     
-    csv_id = storage.put_cloudobject(do_predictions(posts_dict).encode('utf8'), BUCKET_NAME, path)
-    return csv_id
+    return row
 
 def do_predictions(posts_dict):
     political_pred = political_analysis(posts_dict.values())
@@ -89,26 +84,14 @@ def do_predictions(posts_dict):
     w.writerow(posts_dict)
     return output.getvalue()
 
-def check_create_dir(path, media):
-    if not os.path.exists(path):
-        os.mkdir(path)
-        f = open(path+media, 'a')
-        writer = csv.writer(f)
-        writer.writerow(header)
-        f.close()
-      
-      
-def total_scoring(dir_path, tcsv_id, fcsv_id, storage):
+def total_scoring(id, storage):
     score = 0
-    facebook_csv = storage.get_cloudobject(fcsv_id)
-    twitter_csv = storage.get_cloudobject(tcsv_id)
-    facebook_csv = facebook_csv.decode()
-    twitter_csv = twitter_csv.decode()
+    posts = storage.get_cloudobject(id)
     i=0
     valid_post=False
-    posts = twitter_csv.split('\n')
-    posts.extend(facebook_csv.split('\n'))
-    post = ""
+    posts = posts.split('\n')
+    posts.extend(posts.split('\n'))
+    post = " "
     while(i<len(posts) and valid_post is False):
         if(posts[i] != ' ' and posts[i] != '' and i != 0):
             post = posts[i]
@@ -172,7 +155,7 @@ def political_analysis(posts):
         return "neutral"
 
 def religion_analysis(posts):
-    islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah" "islam", "mecca", "muhammad", "mosque", "muslim", 
+    islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah", "islam", "mecca", "muhammad", "mosque", "muslim", 
         "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
         "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
         "zakat", "kaaba", "eid al fitr","khutbah", "eid al adha", "p.b.u.h"]
@@ -217,6 +200,14 @@ def religion_analysis(posts):
     else:
         return "neutral"
 
+def merge_posts(posts, path, storage):
+    posts_dict = {}
+    for post, column_name in zip(posts, header):
+        posts_dict[column_name] = post
+    id = storage.put_cloudobject(do_predictions(posts_dict), BUCKET_NAME, path+".csv")
+    return id
+    
+
 @app.route('/do_security_analysis')
 def do_security_analysis():
     registred_users = {}
@@ -224,16 +215,21 @@ def do_security_analysis():
     avatar="usipiton"
     storage = Storage()
     if(avatar in registred_users.keys()):
-        init_path = registred_users.get(avatar)
+        path = registred_users.get(avatar)
     else:
-        init_path = registred_users[avatar] = str(uuid.uuid4())
+        path = registred_users[avatar] = str(uuid.uuid4())
     
-    fexec.call_async(twitter_crawler_function, (request.args.get('tname'), init_path))
-    fexec.call_async(twitter_preprocessing_function, (fexec.get_result, init_path,))
-    tcsv_id = fexec.get_result
-    fexec.call_async(facebook_crawler_processing_function, (request.args.get('fname'), init_path))
-    fexec.call_async(do_predictions, (init_path, tcsv_id, fexec.get_result))
-    return str(fexec.get_result)
+    fexec.call_async(twitter_crawler_function, request.args.get('tname'))
+    posts = fexec.get_result()
+    fexec.map(twitter_preprocessing_function, posts)
+    posts = fexec.get_result()
+    fexec.call_async(facebook_crawler_processing_function, (request.args.get('fname')))
+    posts2 = fexec.get_result()
+    posts = posts + posts2
+    fexec.call_async(merge_posts, (posts, path))
+    obj_id = fexec.get_result()
+    fexec.map(total_scoring, obj_id)
+    return str(2)
 
 if __name__ == '__main__':
   app.run(debug=True)  
