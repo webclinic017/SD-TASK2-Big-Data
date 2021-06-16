@@ -55,4 +55,5 @@ urllib3
 uuid
 operator
 io
+dask.utils
 
