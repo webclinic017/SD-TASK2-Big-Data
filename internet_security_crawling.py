@@ -15,6 +15,8 @@ import uuid
 from flask import Flask, render_template, request
 import operator
 import pandas as pd
+import re
+import numpy as np
 
 BUCKET_NAME='sd-task2'
 
@@ -105,6 +107,68 @@ def write_csv_posts(texts):
     for row in texts:
         w.writerow(row)
     return str.encode(output.getvalue())
+
+def remove_hashtags(post, pattern1, pattern2):
+    r = re.findall(pattern1, post)
+    for i in r:
+        tweet = re.sub(i, '', tweet)
+    r = re.findall(pattern2, tweet)
+    for i in r:
+        tweet = re.sub(i, '', tweet)
+    return tweet
+
+def remove_links(post):
+    tweet_no_link = re.sub(r"http\S+", "", post)
+    return tweet_no_link
+#STATISTICS
+def remove_users(post, pattern1, pattern2):
+    r = re.findall(pattern1, post)
+    for i in r:
+        post = re.sub(i, '', post)
+    r = re.findall(pattern2, post)
+    for i in r:
+        post = re.sub(i, '', post)
+    return post
+
+def clean_posts(df):
+    stop_words = stopwords.words('english')
+    stop_words.extend(['from', 'https', 'twitter', 'religions',     'pic','twitt',])
+    df.drop_duplicates(subset=['posts_text'], keep='first', inplace=True)
+    df['tidy_post'] = np.vectorize(remove_users)(df['posts_text'],     "@ [\w]*", "@[\w]*")
+    df['tidy_post'] = df['tidy_post'].str.lower()
+    df['tidy_post'] = np.vectorize(remove_hashtags)(df['tidy_post'], "# [\w]*", "#[\w]*")
+    df['tidy_post'] = np.vectorize(remove_links)(df['tidy_post'])
+    df['tidy_post'] = df['tidy_post'].str.replace("[^a-zA-Z#]", " ")
+
+def show_basic_statistics(df):
+    count = df['posts_text'].str.split().str.len()
+    count.index = count.index.astype(str) + 'words:'
+    count.sort_index(inplace=True)
+    #Basic statistics
+    print("Total number of words", count.sum(), "words")
+    print("Mean number of words per tweet:", round(count.mean(),2), "words")
+    df["tweet_length"] = df["posts_text"].str.len()
+    print("Total length of the dataset is:", df.tweet_length.sum(), "chars")
+    print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
+
+def total_scoring(obj_id, storage):
+    score = 0
+    posts = storage.get_cloudobject(obj_id).decode()
+    posts = posts.split('\n')
+    texts = []
+    for post in posts:
+        post = post.split(',')
+        if len(post)>5:
+            texts.append(post[6])
+    csv_path = write_csv_posts(texts)
+
+    df = pd.read_csv(csv_path, index_col=[0], error_bad_lines=False)
+    df.columns = ["posts_text"]
+    df.head()
+
+    show_basic_statistics(df)
+    clean_posts(df)
+    return score
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -251,7 +315,7 @@ def do_security_analysis():
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
     obj_id = fexec.get_result()
-    invoke_notebook(obj_id, fexec)
+    fexec.map(total_scoring, obj_id)
     return str(score)
 
 if __name__ == '__main__':
