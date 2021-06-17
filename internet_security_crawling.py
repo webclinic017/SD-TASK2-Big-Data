@@ -17,6 +17,7 @@ import uuid
 from flask import Flask, render_template, request
 import operator
 import ast
+import re
 
 BUCKET_NAME='sd-task2'
 
@@ -25,8 +26,8 @@ twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
 twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
 
-posts_header = ["political_analysis", "religion_analysis", "protected", "geo_enabled", "geo", "coordinates", "description", "post_id", "post_created_at", "post_text"]
-profile_header = ["id", "user_name", "name", "account_created_at", "location", "URL"]
+posts_header = ["political_analysis", "religion_analysis", "coordinates", "post_id", "post_created_at", "post_text"]
+profile_header = ["id", "user_name", "name", "account_created_at", "location", "URL", "protected", "geo_enabled", "description"]
 auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth)
@@ -42,7 +43,7 @@ def facebook_profile_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,link,location']
     profile = graph.get_object(id="me",fields=field)
-    row = [str(profile['id']).replace(',', " "), "null", str(profile['name']).replace(',', " "), "null", str(profile['location']).replace(',', " "), str(profile['link']).replace(',', " "), 'null', 'null',
+    row = [str(profile['id']).replace(',', " "), "null", str(profile['name']).replace(',', " "), "null", str(profile['location']['name']).replace(',', " "), str(profile['link']).replace(',', " "), 'null', 'null',
         "null"]
     return row
 
@@ -78,51 +79,41 @@ def twitter_posts_preprocessing(post, storage):
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
-    posts_dict = {}
-    profile_dict = {}
-
-    profile_dict = {}
-    posts_dict = {}
-
-    for k in profile_header:
-        profile_dict[k] = []
-    for k in posts_header:
-        posts_dict[k] = []
-    
-    for profile_field, column_name in zip(tprofile, profile_header):
-        profile_dict[column_name].append(profile_field)
-    for profile_field, column_name in zip(fprofile, profile_header):
-        profile_dict[column_name].append(profile_field)
-    for field, column_name in zip(posts, posts_header):
-        posts_dict[column_name].append(field)
-    posts_dict = do_predictions(posts_dict)
-    id = storage.put_cloudobject(write_csv_dict(profile_dict | posts_dict), BUCKET_NAME, path+".csv")
+    posts = do_predictions(posts)
+    id = storage.put_cloudobject(write_csv_dict([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
     return id
 
-def do_predictions(posts_dict):
-    political_pred = political_analysis(posts_dict.values())
-    religion_pred = religion_analysis(posts_dict.values())
-    for post in posts_dict.values():
-        if(len(post) > 14):
-            post[5] = political_pred
-            post[6] = religion_pred
-    return posts_dict
+def do_predictions(posts):
+    political_pred = political_analysis(posts)
+    religion_pred = religion_analysis(posts)
+    for post in posts:
+        if(len(post) > 5):
+            post[0] = political_pred
+            post[1] = religion_pred
+    return posts
 
-def write_csv_dict(complete_dict):
+def write_csv_dict(csv_content):
     output = io.StringIO()
-    w = csv.DictWriter(output, complete_dict.keys())
-    for v in complete_dict.values():
-        w.writerow(v)
+    w = csv.writer(output)
+    for i in range(2):
+        w.writerow(csv_content[i])
+    for row in csv_content[2]:
+        w.writerow(row)
     return str.encode(output.getvalue())
 
 def total_scoring(obj_id, storage):
     score = 0
     posts = storage.get_cloudobject(obj_id).decode()
-    print(ast.literal_eval(posts))
-    i=0
-    valid_post=False
-    posts = posts.split("\",")
-    score+=predictions_scoring(post.split(','))
+    posts = posts.split('\n')
+    print(posts)
+    score+=profile_scoring(posts[0], posts[1])
+    i=2
+    trobat=False
+    while i<len(posts)-2 and trobat == False:
+        if (predictions_scoring(posts[i]) != -1):
+            score+=predictions_scoring(posts[i])
+            trobat=True
+        i+=1
     return score
 
 ### Vulnerability Scoring (CVSS Score):
@@ -136,20 +127,23 @@ def total_scoring(obj_id, storage):
 #     location-->+5 points
 #     political idelogy != neutral-->+40 points
 #     religion ideology not neutral-->+40 points
-def profile_scoring(twitter_post, facebook_post):
+def profile_scoring(twitter_profile, facebook_profile):
     score=0
-    #print(len(post[3]))
-    if(len(twitter_post) > 14):
-        if(len(twitter_post[3]) > 0 or len(facebook_post[3]) > 0): score+=5           #location
-        if(twitter_post[7] !=  "True" or facebook_post[7] !=  "True"): score+=10      #public profile
-        if((twitter_post[8] != "False") and (twitter_post[9] != "None") and (twitter_post[10] != "None")): score+=90     #geo enabled and the position is visible, twitter excl
+    twitter_profile = twitter_profile.split(',')
+    facebook_profile = facebook_profile.split(',')
+    if(len(twitter_profile) > 8 or len(facebook_profile) > 8):
+        if(len(twitter_profile[4]) > 0 or len(facebook_profile[4]) > 0): score+=5           #location
+        if("True" in str(twitter_profile[6])): score+=10      #public profile
+        if(("False" not in str(twitter_profile[7]))): score+=90     #geo enabled and the position is visible, twitter excl
     return score
 
 def predictions_scoring(post):
-    score = 0
-    if(len(post) > 14):
-        if(post[5] != "neutral"): score+=40   #politic
-        if(post[6] != "neutral"): score+=40   #religion
+    score = -1
+    post = post.split(',')
+    if(len(post) > 5):
+        score =  0
+        if(post[0] != "neutral"): score+=40   #politic
+        if(post[1] != "neutral"): score+=40   #religion
     return score
 
 def political_analysis(posts):
@@ -197,9 +191,9 @@ def religion_analysis(posts):
     jewish_words_freq=0
     budism_words_freq=0
     for post in posts:
-        if(len(post) > 14):
-            descr = post[11].lower()
-            post_text = post[14].lower()
+        if(len(post) > 6):
+            descr = post[4].lower()
+            post_text = post[5].lower()
             for word in islam_words:
                 if(word in descr or word in post_text):
                     islam_words_freq+=1
@@ -222,18 +216,6 @@ def religion_analysis(posts):
         return max_value
     else:
         return "neutral"
-    
-def get_valid_post(posts):
-    post = " "
-    valid_post = False
-    i = 0
-    while(i<len(posts) and valid_post is False):
-        if(posts[i] != ' ' and posts[i] != '' and i != 0):
-            post = posts[i]
-            if(len(post) > 14):
-                valid_post=True
-        i+=1
-    return post
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
@@ -242,7 +224,7 @@ def do_security_analysis():
     posts2 = []
     score = 0
     #avatar = request.args.get('avatar')
-    avatar="usipiton"
+    avatar="usi"
     storage = Storage()
     if(avatar in registred_users.keys()):
         path = registred_users.get(avatar)
@@ -251,26 +233,24 @@ def do_security_analysis():
     storage = Storage()
     twitter_username = request.args.get('tname')
     facebook_token = request.args.get('fname')
+    facebook_posts = []
     if twitter_username is not None:
         twitter_profile=twitter_profile_crawler(twitter_username)
     
         posts=twitter_crawler_function(twitter_username, storage)
         twitter_posts=[]
         for post in posts:
-            twitter_posts+=twitter_posts_preprocessing(post, storage)
+            twitter_posts.append(twitter_posts_preprocessing(post, storage))
             
 
     if facebook_token is not None:
         facebook_profile=facebook_profile_crawler(facebook_token)
-        facebook_posts=facebook_posts_crawler(facebook_token, storage)
-
+        facebook_posts.append(facebook_posts_crawler(facebook_token, storage))
     posts = twitter_posts + facebook_posts
     obj_id=merge_and_push_info(posts, twitter_profile, facebook_profile, path, storage)
 
-    profile_scoring(twitter_profile, facebook_profile)
-
-    total_scoring(obj_id, storage)
-    return str(1)
+    score=total_scoring(obj_id, storage)
+    return str(score)
 
 if __name__ == '__main__':
   app.run(debug=True)  
