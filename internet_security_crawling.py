@@ -15,7 +15,6 @@ import uuid
 from flask import Flask, render_template, request
 import operator
 import pandas as pd
-from ipynb.fs.full.notebook import *
 
 BUCKET_NAME='sd-task2'
 
