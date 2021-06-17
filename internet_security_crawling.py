@@ -19,7 +19,7 @@ import re
 import numpy as np
 
 BUCKET_NAME='sd-task2'
-
+fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
@@ -56,7 +56,10 @@ def twitter_crawler_function(twitter_screen_name):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
-    return posts
+    lista=[]
+    for post in posts:
+        lista.append(twitter_posts_preprocessing(post))
+    return lista
 
 def facebook_posts_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
@@ -78,7 +81,7 @@ def twitter_posts_preprocessing(post):
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     #posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "merg"+".csv")
     return id
 
 #def do_predictions(posts):
@@ -100,13 +103,13 @@ def write_csv_body(csv_content):
         w.writerow(row)
     return str.encode(output.getvalue())
 
-def write_csv_posts(texts):
+def write_csv_posts(posts):
     output = io.StringIO()
     w = csv.writer(output)
-    i=0
-    for row in texts:
-        w.writerow(row)
-    return str.encode(output.getvalue())
+    for post in posts:
+       k= post.replace('[', '').replace(']', '').split(',')
+       w.writerow([k[6]])
+    return output.getvalue().encode('utf-8')
 
 def remove_hashtags(post, pattern1, pattern2):
     r = re.findall(pattern1, post)
@@ -152,23 +155,11 @@ def show_basic_statistics(df):
     print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
 
 def total_scoring(obj_id, storage):
-    score = 0
+    
     posts = storage.get_cloudobject(obj_id).decode()
-    posts = posts.split('\n')
-    texts = []
-    for post in posts:
-        post = post.split(',')
-        if len(post)>5:
-            texts.append(post[6])
-    csv_path = write_csv_posts(texts)
-
-    df = pd.read_csv(csv_path, index_col=[0], error_bad_lines=False)
-    df.columns = ["posts_text"]
-    df.head()
-
-    show_basic_statistics(df)
-    clean_posts(df)
-    return score
+    posts=posts.split('\",\"')
+    posts=write_csv_posts(posts)
+    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -284,7 +275,6 @@ def religion_analysis(posts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
-    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
     registred_users = {}
     posts = []
     score = 0
@@ -319,4 +309,4 @@ def do_security_analysis():
     return str(score)
 
 if __name__ == '__main__':
-  app.run(debug=True)  
+  app.run(debug=True) 
