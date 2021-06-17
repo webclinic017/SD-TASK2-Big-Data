@@ -54,6 +54,6 @@ lithops
 urllib3
 uuid
 operator
-io
-ast
-re
+sklearn
+pandas
+ipynb

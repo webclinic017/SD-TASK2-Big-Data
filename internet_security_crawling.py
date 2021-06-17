@@ -7,8 +7,6 @@ import os
 import sys
 import redis
 import json
-from xmlrpc.server import SimpleXMLRPCServer
-from xmlrpc.server import SimpleXMLRPCRequestHandler
 from lithops.storage import Storage
 from lithops.serverless import ServerlessHandler
 import io
@@ -16,8 +14,8 @@ from hashlib import md5
 import uuid
 from flask import Flask, render_template, request
 import operator
-import ast
-import re
+import pandas as pd
+from ipynb.fs.full.notebook import *
 
 BUCKET_NAME='sd-task2'
 
@@ -32,7 +30,6 @@ auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth)
 
-fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
 app = Flask(__name__)
 
 @app.route('/')
@@ -49,18 +46,18 @@ def facebook_profile_crawler(facebook_token):
 
 def twitter_profile_crawler(twitter_screen_name):
     user = api.get_user(twitter_screen_name)
-    row=[str(user.id_str), str(user.screen_name).replace(',', " "), str(user.name).replace(',', " "), str(user.created_at).replace(',', " "), str(user.location).replace(',', " "), 
+    row = [str(user.id_str), str(user.screen_name).replace(',', " "), str(user.name).replace(',', " "), str(user.created_at).replace(',', " "), str(user.location).replace(',', " "), 
        str(user.url).replace(',', " "), str(user.protected).replace(',', " "), str(user.geo_enabled).replace(',', " "), 
        str(user.description).replace(',', " ")]
     return row
 
-def twitter_crawler_function(twitter_screen_name, storage):
+def twitter_crawler_function(twitter_screen_name):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
     return posts
 
-def facebook_posts_crawler(facebook_token, storage):
+def facebook_posts_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['posts']
     profile = graph.get_object(id="me",fields=field)
@@ -70,7 +67,7 @@ def facebook_posts_crawler(facebook_token, storage):
             row = [" ", " ", str(post.get('id')), str(profile.get('created_time')), "null", "null", str(post.get('message').replace(',', " "))]
     return row
 
-def twitter_posts_preprocessing(post, storage):
+def twitter_posts_preprocessing(post):
     row = []
     try:
         row=[" ", " ", str(post.id).replace(',', " "), str(post.created_at).replace(',', " "), str(post.geo).replace(',', " "), str(post.coordinates).replace(',', " "), str(post.full_text.replace(',', " "))]
@@ -79,42 +76,36 @@ def twitter_posts_preprocessing(post, storage):
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
-    posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_dict([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
+    #posts = do_predictions(posts)
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
     return id
 
-def do_predictions(posts):
-    political_pred = political_analysis(posts)
-    religion_pred = religion_analysis(posts)
-    for post in posts:
-        if(len(post) > 5):
-            post[0] = political_pred
-            post[1] = religion_pred
-    return posts
+#def do_predictions(posts):
+#    political_pred = political_analysis(posts)
+#    religion_pred = religion_analysis(posts)
+#    for post in posts:
+#        if(len(post) > 5):
+#            post[0] = political_pred
+#            post[1] = religion_pred
+#    return posts
 
-def write_csv_dict(csv_content):
+def write_csv_body(csv_content):
     output = io.StringIO()
     w = csv.writer(output)
+    i=0
     for i in range(2):
         w.writerow(csv_content[i])
     for row in csv_content[2]:
         w.writerow(row)
     return str.encode(output.getvalue())
 
-def total_scoring(obj_id, storage):
-    score = 0
-    posts = storage.get_cloudobject(obj_id).decode()
-    posts = posts.split('\n')
-    print(posts)
-    score+=profile_scoring(posts[0], posts[1])
-    i=2
-    trobat=False
-    while i<len(posts)-2 and trobat == False:
-        if (predictions_scoring(posts[i]) != -1):
-            score+=predictions_scoring(posts[i])
-            trobat=True
-        i+=1
-    return score
+def write_csv_posts(texts):
+    output = io.StringIO()
+    w = csv.writer(output)
+    i=0
+    for row in texts:
+        w.writerow(row)
+    return str.encode(output.getvalue())
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -186,6 +177,17 @@ def religion_analysis(posts):
     budism_words = ["ajahn chah", "advaita vedanta", "ayya khema", "bhikkhu payutto", "buddha", "buddhism", "buddhist",
         "chan", "chi kung", "dana", "dharma", "dhamma", "gelugpa", "jhana", "koan", "mahasi", "mahayana", "nibbana", 
         "nirvana", "pali", "sanskrit", "zen"]
+
+    religions = [
+        {'religion':'islam'},
+        {'religion':'catholic'},
+        {'religion':'jewish'},
+        {'religion':'budism'}
+    ]
+
+
+
+
     islam_words_freq=0
     catholic_words_freq=0
     jewish_words_freq=0
@@ -219,37 +221,38 @@ def religion_analysis(posts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
+    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
     registred_users = {}
     posts = []
-    posts2 = []
     score = 0
     #avatar = request.args.get('avatar')
     avatar="usi"
-    storage = Storage()
+
     if(avatar in registred_users.keys()):
         path = registred_users.get(avatar)
     else:
         path = registred_users[avatar] = str(uuid.uuid4())
-    storage = Storage()
+    
     twitter_username = request.args.get('tname')
     facebook_token = request.args.get('fname')
-    facebook_posts = []
     if twitter_username is not None:
-        twitter_profile=twitter_profile_crawler(twitter_username)
-    
-        posts=twitter_crawler_function(twitter_username, storage)
-        twitter_posts=[]
-        for post in posts:
-            twitter_posts.append(twitter_posts_preprocessing(post, storage))
-            
-
+        fexec.call_async(twitter_profile_crawler, twitter_username)
+        fexec.wait()
+        twitter_profile=fexec.get_result()
+        fexec.call_async(twitter_crawler_function, twitter_username)
+        twitter_posts = fexec.get_result()
+        posts.append(twitter_posts)
     if facebook_token is not None:
-        facebook_profile=facebook_profile_crawler(facebook_token)
-        facebook_posts.append(facebook_posts_crawler(facebook_token, storage))
-    posts = twitter_posts + facebook_posts
-    obj_id=merge_and_push_info(posts, twitter_profile, facebook_profile, path, storage)
+        fexec.call_async(facebook_profile_crawler, facebook_token)
+        facebook_profile = fexec.get_result()
+        fexec.call_async(facebook_posts_crawler, facebook_token)
+        facebook_posts = fexec.get_result()
+        posts.append(facebook_posts)
 
-    score=total_scoring(obj_id, storage)
+    fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
+    fexec.wait()
+    obj_id = fexec.get_result()
+    invoke_notebook(obj_id, fexec)
     return str(score)
 
 if __name__ == '__main__':
