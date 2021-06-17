@@ -17,6 +17,9 @@ import operator
 import pandas as pd
 import re
 import numpy as np
+from nltk.corpus import stopwords
+import gensim
+from gensim.utils import simple_preprocess
 
 BUCKET_NAME='sd-task2'
 
@@ -108,6 +111,7 @@ def write_csv_posts(texts):
         w.writerow(row)
     return str.encode(output.getvalue())
 
+#STATISTICS
 def remove_hashtags(post, pattern1, pattern2):
     r = re.findall(pattern1, post)
     for i in r:
@@ -120,7 +124,7 @@ def remove_hashtags(post, pattern1, pattern2):
 def remove_links(post):
     tweet_no_link = re.sub(r"http\S+", "", post)
     return tweet_no_link
-#STATISTICS
+
 def remove_users(post, pattern1, pattern2):
     r = re.findall(pattern1, post)
     for i in r:
@@ -130,15 +134,23 @@ def remove_users(post, pattern1, pattern2):
         post = re.sub(i, '', post)
     return post
 
+def remove_stopwords(tweets):
+    return [[word for word in simple_preprocess(str(tweet)) if word    not in stopwords] for tweet in tweets]
+
+def tokenize(tweet):
+    for word in tweet:
+        yield(gensim.utils.simple_preprocess(str(word), deacc=True)) 
+
 def clean_posts(df):
-    stop_words = stopwords.words('english')
-    stop_words.extend(['from', 'https', 'twitter', 'religions',     'pic','twitt',])
     df.drop_duplicates(subset=['posts_text'], keep='first', inplace=True)
     df['tidy_post'] = np.vectorize(remove_users)(df['posts_text'],     "@ [\w]*", "@[\w]*")
     df['tidy_post'] = df['tidy_post'].str.lower()
     df['tidy_post'] = np.vectorize(remove_hashtags)(df['tidy_post'], "# [\w]*", "#[\w]*")
     df['tidy_post'] = np.vectorize(remove_links)(df['tidy_post'])
     df['tidy_post'] = df['tidy_post'].str.replace("[^a-zA-Z#]", " ")
+    df['tidy_post_tokens'] = list(tokenize(df['tidy_post']))
+    df['tokens_no_stop'] = remove_stopwords(df['tidy_post_tokens'])
+    return df
 
 def show_basic_statistics(df):
     count = df['posts_text'].str.split().str.len()
@@ -154,20 +166,17 @@ def show_basic_statistics(df):
 def total_scoring(obj_id, storage):
     score = 0
     posts = storage.get_cloudobject(obj_id).decode()
-    posts = posts.split('\n')
-    texts = []
-    for post in posts:
-        post = post.split(',')
-        if len(post)>5:
-            texts.append(post[6])
-    csv_path = write_csv_posts(texts)
+    posts=posts.split('\",\"')
+    posts=write_csv_posts(posts)
+    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
 
-    df = pd.read_csv(csv_path, index_col=[0], error_bad_lines=False)
+    df = pd.read_csv(str.decode(posts), index_col=[0], error_bad_lines=False)
     df.columns = ["posts_text"]
     df.head()
 
     show_basic_statistics(df)
-    clean_posts(df)
+    new_df = clean_posts(df)
+    new_df.to_pickle('pre_processed_posts.pkl')
     return score
 
 ### Vulnerability Scoring (CVSS Score):

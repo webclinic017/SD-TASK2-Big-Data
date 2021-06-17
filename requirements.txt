@@ -54,6 +54,10 @@ lithops
 urllib3
 uuid
 operator
-sklearn
 pandas
 ipynb
+re
+numpy
+nltk
+gensim
+pyLDAvis
