@@ -17,6 +17,7 @@ import operator
 import pandas as pd
 import re
 import numpy as np
+import string
 
 BUCKET_NAME='sd-task2'
 fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
@@ -41,15 +42,14 @@ def facebook_profile_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,link,location']
     profile = graph.get_object(id="me",fields=field)
-    row = [str(profile['id']).replace(',', " "), "null", str(profile['name']).replace(',', " "), "null", str(profile['location']['name']).replace(',', " "), str(profile['link']).replace(',', " "), 'null', 'null',
+    row = [cleaner(str(profile['id'])), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), cleaner(str(profile['link'])), 'null', 'null',
         "null"]
     return row
 
 def twitter_profile_crawler(twitter_screen_name):
     user = api.get_user(twitter_screen_name)
-    row = [str(user.id_str), str(user.screen_name).replace(',', " "), str(user.name).replace(',', " "), str(user.created_at).replace(',', " "), str(user.location).replace(',', " "), 
-       str(user.url).replace(',', " "), str(user.protected).replace(',', " "), str(user.geo_enabled).replace(',', " "), 
-       str(user.description).replace(',', " ")]
+    row = [cleaner(str(user.id_str)), cleaner(str(user.screen_name)), cleaner(str(user.name)), cleaner(str(user.created_at)), cleaner(str(user.location)), 
+       cleaner(str(user.url)), cleaner(str(user.protected)), cleaner(str(user.geo_enabled)), cleaner(str(user.description))]
     return row
 
 def twitter_crawler_function(twitter_screen_name):
@@ -65,18 +65,19 @@ def facebook_posts_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['posts']
     profile = graph.get_object(id="me",fields=field)
-
+    posts = []
     for post in profile['posts']['data']:
         if post.get('message'):
-            row = [" ", " ", str(post.get('id')), str(profile.get('created_time')), "null", "null", str(post.get('message').replace(',', " "))]
-    return row
+            row = ['null','null', cleaner(str(post.get('id'))), cleaner(str(profile.get('created_time'))), "null", "null", cleaner(str(post.get('message')))]
+            posts.append(row)
+    return posts
 
 def twitter_posts_preprocessing(post):
     row = []
     try:
-        row=[" ", " ", str(post.id).replace(',', " "), str(post.created_at).replace(',', " "), str(post.geo).replace(',', " "), str(post.coordinates).replace(',', " "), str(post.full_text.replace(',', " "))]
+        row=['null','null', cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.full_text))]
     except:
-        row=[" ", " ", str(post.id).replace(',', " "), str(post.created_at).replace(',', " "), str(post.geo).replace(',', " "), str(post.coordinates).replace(',', " "), str(post.text.replace(',', " "))]
+        row=['null','null', cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.text))]
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
@@ -101,29 +102,29 @@ def write_csv_body(csv_content):
         w.writerow(csv_content[i])
     for row in csv_content[2]:
         w.writerow(row)
-    return str.encode(output.getvalue())
+    return output.getvalue().encode('utf8')
 
 def write_csv_posts(posts):
     output = io.StringIO()
     w = csv.writer(output)
     for post in posts:
-       k= post.replace('[', '').replace(']', '').split(',')
-       w.writerow([k[6]])
-    return output.getvalue().encode('utf-8')
+       k= post.split(',')
+       print(k)
+       if len(k)>5:
+           w.writerow([k[6]])
+    return output.getvalue()
 
-def cleaner(tweet):
-    posts=[]
-    for tw in tweet:
-        tw[6] = re.sub("@[A-Za-z0-9]+","",tw[6]) #Remove @ sign
-        tw[6] = re.sub(r"(?:\@|http?\://|https?\://|www)\S+", "", tweet) #Remove http links
-        tw[6] = " ".join(tw[6].split())
-        tw[6] = tw[6].replace("#", "").replace("_", " ") #Remove hashtag sign but keep the text
-        tw[6] = tw[6].replace("'", " ").replace("_", " ")
-        tw[6] = tw[6].replace("True", " ").replace("_", " ")
-        tw[6] = tw[6].replace("&", " ").replace("_", " ")
-        tw[6] = tw[6].replace("\"", " ").replace("_", " ")
-        #tw[6] = tw[6].lower()
-    posts.append(tw)
+
+def cleaner(field):
+    field = re.sub("@[A-Za-z0-9]+","",field) #Remove @ sign
+    field = re.sub(r"(?:\@|http?\://|https?\://|www)\S+", "", field) #Remove http links
+    field = field.replace("#", "").replace("_", " ") #Remove hashtag sign but keep the text
+    field = re.sub(r'\d+', '', field)
+    field = field.translate(str.maketrans('', '', string.punctuation))
+    field = field.strip()
+    field = field.lower()
+    field = field.replace('\r', '').replace('\n','')
+    return field
 
 def show_basic_statistics(df):
     count = df['posts_text'].str.split().str.len()
@@ -138,10 +139,10 @@ def show_basic_statistics(df):
 
 def total_scoring(obj_id, storage):
     
-    posts = storage.get_cloudobject(obj_id).decode()
+    posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts=posts.split('\",\"')
     posts=write_csv_posts(posts)
-    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
+    storage.put_cloudobject(posts.encode('utf8'),BUCKET_NAME, "dades.csv")
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -172,23 +173,7 @@ def predictions_scoring(post):
         if(post[0] != "neutral"): score+=40   #politic
         if(post[1] != "neutral"): score+=40   #religion
     return score
-
-def countFrequency(my_list, freq):
- 
-    # Creating an empty dictionary
-    for item in my_list:
-        if (item in freq):
-            freq[item] += 1
- 
- 
-def countFrequency(my_list, freq):
- 
-    # Creating an empty dictionary
-    for item in my_list:
-        if (item in freq.keys()):
-            freq[item] += 1
-    return freq
-            
+   
 def countFrequency(my_list, freq):
  
     # Creating an empty dictionary
@@ -292,6 +277,8 @@ def religion_analysis(texts):
 def do_security_analysis():
     registred_users = {}
     posts = []
+    twitter_posts = []
+    facebook_posts = []
     score = 0
     #avatar = request.args.get('avatar')
     avatar="usi"
@@ -315,7 +302,7 @@ def do_security_analysis():
         facebook_profile = fexec.get_result()
         fexec.call_async(facebook_posts_crawler, facebook_token)
         facebook_posts = fexec.get_result()
-        posts.append(facebook_posts)
+    posts = twitter_posts + facebook_posts
 
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
