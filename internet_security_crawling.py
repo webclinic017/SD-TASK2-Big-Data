@@ -122,6 +122,7 @@ def cleaner(tweet):
         tw[6] = tw[6].replace("True", " ").replace("_", " ")
         tw[6] = tw[6].replace("&", " ").replace("_", " ")
         tw[6] = tw[6].replace("\"", " ").replace("_", " ")
+        #tw[6] = tw[6].lower()
     posts.append(tw)
 
 def show_basic_statistics(df):
@@ -188,6 +189,14 @@ def countFrequency(my_list, freq):
             freq[item] += 1
     return freq
             
+def countFrequency(my_list, freq):
+ 
+    # Creating an empty dictionary
+    for item in my_list:
+        if (item in freq.keys()):
+            freq[item] += 1
+    return freq
+            
 def political_analysis(texts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
@@ -206,8 +215,8 @@ def political_analysis(texts):
     for word in republicans_words:
         republican_dict[word]=0
     for text in texts:
-        democrat_dict = countFrequency(text.split(" "), democrat_dict)
-        republican_dict = countFrequency(text.split(" "), republican_dict)
+        democrat_dict = countFrequency(str(text).split(" "), democrat_dict)
+        republican_dict = countFrequency(str(text).split(" "), republican_dict)
     for word in democrat_dict:
         democrat_freq+=democrat_dict[word]
     for word in republican_dict:
@@ -226,7 +235,7 @@ def religion_analysis(texts):
     islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah", "islam", "mecca", "muhammad", "mosque", "muslim", 
         "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
         "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
-        "zakat", "kaaba", "eid al fitr","khutbah", "eid al adha", "p.b.u.h"]
+        "zakat", "kaaba", "eid al fitr","khutbah", "eid al adha", "p.b.u.h", "sheikh"]
     catholic_words = ["apostle", "assembly", "bible", "blessed sacrament", "celebrant", "discernment", "disciple", 
         "easter", "gospel", "eucharist", "grace", "communion", "holy water", "jesus", "christ", "new testament", "old testament",
         "sacrament", "catholic", "christmas", "christian", "confession", "convent", "godparent", "immaculate", "pentateuch", "saint",
@@ -257,20 +266,20 @@ def religion_analysis(texts):
         jewish_dict[word]=0
     for word in budism_words:
         budism_dict[word]=0
+    
         
     for text in texts:
-        countFrequency(str(text).split(' '), islam_dict)
-        countFrequency(str(text).split(' '), catholic_dict)
-        countFrequency(str(text).split(' '), jewish_dict)
-        countFrequency(str(text).split(' '), budism_dict)
-
-    for word in islam_dict.keys():
+        islam_dict = countFrequency(str(text).split(' '), islam_dict)
+        catholic_dict = countFrequency(str(text).split(' '), catholic_dict)
+        jewish_dict = countFrequency(str(text).split(' '), jewish_dict)
+        budism_dict = countFrequency(str(text).split(' '), budism_dict)
+    for word in islam_dict:
         results["islam"]+=islam_dict[word]
-    for word in catholic_dict.keys():
+    for word in catholic_dict:
         results["catholic"]+=catholic_dict[word]
-    for word in jewish_dict.keys():
+    for word in jewish_dict:
         results["jewish"]+=jewish_dict[word]
-    for word in budism_dict.keys():
+    for word in budism_dict:
         results["budism"]+=budism_dict[word]
 
     max_value=max(results.items(), key=operator.itemgetter(1))[0]
