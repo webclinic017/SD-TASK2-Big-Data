@@ -43,13 +43,13 @@ def facebook_profile_crawler(facebook_token):
     field = ['id,name,link,location']
     profile = graph.get_object(id="me",fields=field)
     row = [cleaner(str(profile['id'])), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), cleaner(str(profile['link'])), 'null', 'null',
-        "null"]
+        "null"+"%"]
     return row
 
 def twitter_profile_crawler(twitter_screen_name):
     user = api.get_user(twitter_screen_name)
     row = [cleaner(str(user.id_str)), cleaner(str(user.screen_name)), cleaner(str(user.name)), cleaner(str(user.created_at)), cleaner(str(user.location)), 
-       cleaner(str(user.url)), cleaner(str(user.protected)), cleaner(str(user.geo_enabled)), cleaner(str(user.description))]
+       cleaner(str(user.url)), cleaner(str(user.protected)), cleaner(str(user.geo_enabled)), cleaner(str(user.description))+"%"]
     return row
 
 def twitter_crawler_function(twitter_screen_name):
@@ -68,21 +68,21 @@ def facebook_posts_crawler(facebook_token):
     posts = []
     for post in profile['posts']['data']:
         if post.get('message'):
-            row = ['null','null', cleaner(str(post.get('id'))), cleaner(str(profile.get('created_time'))), "null", "null", cleaner(str(post.get('message')))]
+            row = [" ", " ", cleaner(str(post.get('id'))), cleaner(str(profile.get('created_time'))), "null", "null", cleaner(str(post.get('message')))+"%"]
             posts.append(row)
     return posts
 
 def twitter_posts_preprocessing(post):
     row = []
     try:
-        row=['null','null', cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.full_text))]
+        row=[" ", " ", cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.full_text))+"%"]
     except:
-        row=['null','null', cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.text))]
+        row=[" ", " ", cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.text))+"%"]
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "merg"+".csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "sd"+".csv")
     return id
 
 def do_predictions(posts):
@@ -103,6 +103,7 @@ def write_csv_body(csv_content):
     for row in csv_content[2]:
         w.writerow(row)
     return output.getvalue().encode('utf8')
+
 
 def write_csv_posts(posts):
     output = io.StringIO()
@@ -142,7 +143,7 @@ def total_scoring(obj_id, storage):
     posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts=posts.split('\",\"')
     posts=write_csv_posts(posts)
-    storage.put_cloudobject(posts.encode('utf8'),BUCKET_NAME, "dades.csv")
+    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
