@@ -18,9 +18,8 @@ import pandas as pd
 import re
 import numpy as np
 
-
 BUCKET_NAME='sd-task2'
-
+fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
 twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
 twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
 twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
@@ -57,7 +56,10 @@ def twitter_crawler_function(twitter_screen_name):
     posts=[]
     for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
         posts.append(post)
-    return posts
+    lista=[]
+    for post in posts:
+        lista.append(twitter_posts_preprocessing(post))
+    return lista
 
 def facebook_posts_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
@@ -79,11 +81,10 @@ def twitter_posts_preprocessing(post):
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "holaaaaaaaaa"+".csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "merg"+".csv")
     return id
 
 def do_predictions(posts):
-    #posts = cleaner(posts)
     political_pred = political_analysis(posts)
     religion_pred = religion_analysis(posts)
     for post in posts:
@@ -108,9 +109,7 @@ def write_csv_posts(posts):
     for post in posts:
        k= post.replace('[', '').replace(']', '').split(',')
        w.writerow([k[6]])
-    return output.getvalue()
-
- 
+    return output.getvalue().encode('utf-8')
 
 def cleaner(tweet):
     posts=[]
@@ -137,13 +136,11 @@ def show_basic_statistics(df):
     print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
 
 def total_scoring(obj_id, storage):
-    score = 0
+    
     posts = storage.get_cloudobject(obj_id).decode()
     posts=posts.split('\",\"')
     posts=write_csv_posts(posts)
     storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
-
-    return score
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -181,10 +178,16 @@ def countFrequency(my_list, freq):
     for item in my_list:
         if (item in freq):
             freq[item] += 1
-        else:
-            freq[item] = 1
  
  
+def countFrequency(my_list, freq):
+ 
+    # Creating an empty dictionary
+    for item in my_list:
+        if (item in freq.keys()):
+            freq[item] += 1
+    return freq
+            
 def political_analysis(texts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
@@ -203,17 +206,19 @@ def political_analysis(texts):
     for word in republicans_words:
         republican_dict[word]=0
     for text in texts:
-        countFrequency(str(text).split(' '), democrat_dict)
-        countFrequency(str(text).split(' '), republican_dict)
-    for word in democrat_dict.keys():
+        democrat_dict = countFrequency(text.split(" "), democrat_dict)
+        republican_dict = countFrequency(text.split(" "), republican_dict)
+    for word in democrat_dict:
         democrat_freq+=democrat_dict[word]
-    for word in republican_dict.keys():
+    for word in republican_dict:
         republican_freq+=republican_dict[word]
+    
     if(democrat_freq>republican_freq):
         return "democrat"
     else:
         if(democrat_freq<republican_freq):
             return "republican"
+   
         else:
             return "neutral"
     
@@ -276,7 +281,6 @@ def religion_analysis(texts):
 
 @app.route('/do_security_analysis')
 def do_security_analysis():
-    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
     registred_users = {}
     posts = []
     score = 0
@@ -311,4 +315,4 @@ def do_security_analysis():
     return str(score)
 
 if __name__ == '__main__':
-  app.run(debug=True)  
+  app.run(debug=True) 
