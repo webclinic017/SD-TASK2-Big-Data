@@ -80,18 +80,18 @@ def twitter_posts_preprocessing(post):
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
-    #posts = do_predictions(posts)
+    posts = do_predictions(posts)
     id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
     return id
 
-#def do_predictions(posts):
-#    political_pred = political_analysis(posts)
-#    religion_pred = religion_analysis(posts)
-#    for post in posts:
-#        if(len(post) > 5):
-#            post[0] = political_pred
-#            post[1] = religion_pred
-#    return posts
+def do_predictions(posts):
+    political_pred = political_analysis(posts)
+    religion_pred = religion_analysis(posts)
+    for post in posts:
+        if(len(post) > 5):
+            post[0] = political_pred
+            post[1] = religion_pred
+    return posts
 
 def write_csv_body(csv_content):
     output = io.StringIO()
@@ -109,7 +109,7 @@ def write_csv_posts(texts):
     i=0
     for row in texts:
         w.writerow(row)
-    return str.encode(output.getvalue())
+    return output.getvalue()
 
 #STATISTICS
 def remove_hashtags(post, pattern1, pattern2):
@@ -148,8 +148,7 @@ def clean_posts(df):
     df['tidy_post'] = np.vectorize(remove_hashtags)(df['tidy_post'], "# [\w]*", "#[\w]*")
     df['tidy_post'] = np.vectorize(remove_links)(df['tidy_post'])
     df['tidy_post'] = df['tidy_post'].str.replace("[^a-zA-Z#]", " ")
-    df['tidy_post_tokens'] = list(tokenize(df['tidy_post']))
-    df['tokens_no_stop'] = remove_stopwords(df['tidy_post_tokens'])
+    df['tidy_no_stop'] = remove_stopwords(df['tidy_post'])
     return df
 
 def show_basic_statistics(df):
@@ -168,15 +167,16 @@ def total_scoring(obj_id, storage):
     posts = storage.get_cloudobject(obj_id).decode()
     posts=posts.split('\",\"')
     posts=write_csv_posts(posts)
-    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
+    storage.put_cloudobject(str.encode(posts),BUCKET_NAME, "dades.csv")
 
-    df = pd.read_csv(str.decode(posts), index_col=[0], error_bad_lines=False)
+    df = pd.read_csv(posts, index_col=[0], error_bad_lines=False)
     df.columns = ["posts_text"]
     df.head()
 
     show_basic_statistics(df)
     new_df = clean_posts(df)
-    new_df.to_pickle('pre_processed_posts.pkl')
+    political_pred = political_analysis(new_df['tidy_no_stop'])
+    religion_pred = religion_analysis(new_df['tidy_no_stop'])
     return score
 
 ### Vulnerability Scoring (CVSS Score):
@@ -209,7 +209,17 @@ def predictions_scoring(post):
         if(post[1] != "neutral"): score+=40   #religion
     return score
 
-def political_analysis(posts):
+def countFrequency(my_list, freq):
+ 
+    # Creating an empty dictionary
+    for item in my_list:
+        if (item in freq):
+            freq[item] += 1
+        else:
+            freq[item] = 1
+ 
+ 
+def political_analysis(texts):
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
         "bin laden", "wall street", "worker", "veteran", "fight", "invest", "education", "military", "war", "medicare", "science", 
@@ -217,24 +227,31 @@ def political_analysis(posts):
     republicans_words = ["good", "security", "great", "unite", "senate", "thank", "good", "meet", "hear", "join", "government", 
         "flag", "church", "unemployment", "regulation", "obamacare", "fail", "better", "faith", "business", "small business", "romney", 
         "leadership", "god", "debt", "spending", "success"]
-    democrat_words_freq=0
-    republican_words_freq=0
-    for post in posts:
-        if(len(post) > 14):
-            for word in democrats_words:
-                if(word in post[11] or word in post[14]):
-                    democrat_words_freq+=1
-            for word in republicans_words:
-                if(word in post[11] or word in post[14]):
-                    republican_words_freq+=1
-    if democrat_words_freq>republican_words_freq:
-        return "democrat"
-    if democrat_words_freq<republican_words_freq:
-        return "republican"
-    else:
-        return "neutral"
+    democrat_dict = {}
+    republican_dict = {}
+    democrat_freq = 0
+    republican_freq = 0
 
-def religion_analysis(posts):
+    for word in democrats_words:
+        democrat_dict[word]=0
+    for word in republicans_words:
+        republican_dict[word]=0
+    for text in texts:
+        countFrequency(text.split(' '), democrat_dict)
+        countFrequency(text.split(' '), republican_dict)
+    for word in democrat_dict.keys():
+        democrat_freq+=democrat_dict[word]
+    for word in republican_dict.keys():
+        republican_freq+=republican_dict[word]
+    if(democrat_freq>republican_freq):
+        return "democrat"
+    else:
+        if(democrat_freq<republican_freq):
+            return "republican"
+        else:
+            return "neutral"
+    
+def religion_analysis(texts):
     islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah", "islam", "mecca", "muhammad", "mosque", "muslim", 
         "prophet", "ramadan", "salam", "salaam", "sharia", "suhoor", "sunna", "sunnah", "sunni", "koran", "coran", 
         "qur'an", "hijab", "halal", "hadith", "imam", "madrassah", "salat", "sawm", "shahada", "sura", "tafsir",
@@ -250,41 +267,41 @@ def religion_analysis(posts):
         "chan", "chi kung", "dana", "dharma", "dhamma", "gelugpa", "jhana", "koan", "mahasi", "mahayana", "nibbana", 
         "nirvana", "pali", "sanskrit", "zen"]
 
-    religions = [
-        {'religion':'islam'},
-        {'religion':'catholic'},
-        {'religion':'jewish'},
-        {'religion':'budism'}
-    ]
+    islam_dict = {}
+    catholic_dict = {}
+    jewish_dict = {}
+    budism_dict = {}
 
-
-
-
-    islam_words_freq=0
-    catholic_words_freq=0
-    jewish_words_freq=0
-    budism_words_freq=0
-    for post in posts:
-        if(len(post) > 6):
-            descr = post[4].lower()
-            post_text = post[5].lower()
-            for word in islam_words:
-                if(word in descr or word in post_text):
-                    islam_words_freq+=1
-            for word in catholic_words:
-                if(word in descr or word in post_text):
-                    catholic_words_freq+=1
-            for word in jewish_words:
-                if(word in descr or word in post_text):
-                    jewish_words_freq+=1
-            for word in budism_words:
-                if(word in descr or word in post_text):
-                    budism_words_freq+=1
     results={}
-    results["catholic"]=catholic_words_freq
-    results["islam"]=islam_words_freq
-    results["jewish"]=jewish_words_freq
-    results["budism"]=budism_words_freq
+    results["catholic"]=0
+    results["islam"]=0
+    results["jewish"]=0
+    results["budism"]=0
+
+    for word in islam_words:
+        islam_dict[word]=0
+    for word in catholic_words:
+        catholic_dict[word]=0
+    for word in jewish_words:
+        jewish_dict[word]=0
+    for word in budism_words:
+        budism_dict[word]=0
+        
+    for text in texts:
+        countFrequency(text.split(' '), islam_dict)
+        countFrequency(text.split(' '), catholic_dict)
+        countFrequency(text.split(' '), jewish_dict)
+        countFrequency(text.split(' '), budism_dict)
+
+    for word in islam_dict.keys():
+        results["islam"]+=islam_dict[word]
+    for word in catholic_dict.keys():
+        results["catholic"]+=catholic_dict[word]
+    for word in jewish_dict.keys():
+        results["jewish"]+=jewish_dict[word]
+    for word in budism_dict.keys():
+        results["budism"]+=budism_dict[word]
+
     max_value=max(results.items(), key=operator.itemgetter(1))[0]
     if (results.get(max_value) > 0):
         return max_value
