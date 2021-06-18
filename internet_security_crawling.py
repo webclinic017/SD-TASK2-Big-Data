@@ -17,9 +17,7 @@ import operator
 import pandas as pd
 import re
 import numpy as np
-from nltk.corpus import stopwords
-import gensim
-from gensim.utils import simple_preprocess
+
 
 BUCKET_NAME='sd-task2'
 
@@ -81,10 +79,11 @@ def twitter_posts_preprocessing(post):
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+".csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "holaaaaaaaaa"+".csv")
     return id
 
 def do_predictions(posts):
+    #posts = cleaner(posts)
     political_pred = political_analysis(posts)
     religion_pred = religion_analysis(posts)
     for post in posts:
@@ -103,53 +102,28 @@ def write_csv_body(csv_content):
         w.writerow(row)
     return str.encode(output.getvalue())
 
-def write_csv_posts(texts):
+def write_csv_posts(posts):
     output = io.StringIO()
     w = csv.writer(output)
-    i=0
-    for row in texts:
-        w.writerow(row)
+    for post in posts:
+       k= post.replace('[', '').replace(']', '').split(',')
+       w.writerow([k[6]])
     return output.getvalue()
 
-#STATISTICS
-def remove_hashtags(post, pattern1, pattern2):
-    r = re.findall(pattern1, post)
-    for i in r:
-        tweet = re.sub(i, '', tweet)
-    r = re.findall(pattern2, tweet)
-    for i in r:
-        tweet = re.sub(i, '', tweet)
-    return tweet
+ 
 
-def remove_links(post):
-    tweet_no_link = re.sub(r"http\S+", "", post)
-    return tweet_no_link
-
-def remove_users(post, pattern1, pattern2):
-    r = re.findall(pattern1, post)
-    for i in r:
-        post = re.sub(i, '', post)
-    r = re.findall(pattern2, post)
-    for i in r:
-        post = re.sub(i, '', post)
-    return post
-
-def remove_stopwords(tweets):
-    return [[word for word in simple_preprocess(str(tweet)) if word    not in stopwords] for tweet in tweets]
-
-def tokenize(tweet):
-    for word in tweet:
-        yield(gensim.utils.simple_preprocess(str(word), deacc=True)) 
-
-def clean_posts(df):
-    df.drop_duplicates(subset=['posts_text'], keep='first', inplace=True)
-    df['tidy_post'] = np.vectorize(remove_users)(df['posts_text'],     "@ [\w]*", "@[\w]*")
-    df['tidy_post'] = df['tidy_post'].str.lower()
-    df['tidy_post'] = np.vectorize(remove_hashtags)(df['tidy_post'], "# [\w]*", "#[\w]*")
-    df['tidy_post'] = np.vectorize(remove_links)(df['tidy_post'])
-    df['tidy_post'] = df['tidy_post'].str.replace("[^a-zA-Z#]", " ")
-    df['tidy_no_stop'] = remove_stopwords(df['tidy_post'])
-    return df
+def cleaner(tweet):
+    posts=[]
+    for tw in tweet:
+        tw[6] = re.sub("@[A-Za-z0-9]+","",tw[6]) #Remove @ sign
+        tw[6] = re.sub(r"(?:\@|http?\://|https?\://|www)\S+", "", tweet) #Remove http links
+        tw[6] = " ".join(tw[6].split())
+        tw[6] = tw[6].replace("#", "").replace("_", " ") #Remove hashtag sign but keep the text
+        tw[6] = tw[6].replace("'", " ").replace("_", " ")
+        tw[6] = tw[6].replace("True", " ").replace("_", " ")
+        tw[6] = tw[6].replace("&", " ").replace("_", " ")
+        tw[6] = tw[6].replace("\"", " ").replace("_", " ")
+    posts.append(tw)
 
 def show_basic_statistics(df):
     count = df['posts_text'].str.split().str.len()
@@ -167,16 +141,8 @@ def total_scoring(obj_id, storage):
     posts = storage.get_cloudobject(obj_id).decode()
     posts=posts.split('\",\"')
     posts=write_csv_posts(posts)
-    storage.put_cloudobject(str.encode(posts),BUCKET_NAME, "dades.csv")
+    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
 
-    df = pd.read_csv(posts, index_col=[0], error_bad_lines=False)
-    df.columns = ["posts_text"]
-    df.head()
-
-    show_basic_statistics(df)
-    new_df = clean_posts(df)
-    political_pred = political_analysis(new_df['tidy_no_stop'])
-    religion_pred = religion_analysis(new_df['tidy_no_stop'])
     return score
 
 ### Vulnerability Scoring (CVSS Score):
@@ -237,8 +203,8 @@ def political_analysis(texts):
     for word in republicans_words:
         republican_dict[word]=0
     for text in texts:
-        countFrequency(text.split(' '), democrat_dict)
-        countFrequency(text.split(' '), republican_dict)
+        countFrequency(str(text).split(' '), democrat_dict)
+        countFrequency(str(text).split(' '), republican_dict)
     for word in democrat_dict.keys():
         democrat_freq+=democrat_dict[word]
     for word in republican_dict.keys():
@@ -288,10 +254,10 @@ def religion_analysis(texts):
         budism_dict[word]=0
         
     for text in texts:
-        countFrequency(text.split(' '), islam_dict)
-        countFrequency(text.split(' '), catholic_dict)
-        countFrequency(text.split(' '), jewish_dict)
-        countFrequency(text.split(' '), budism_dict)
+        countFrequency(str(text).split(' '), islam_dict)
+        countFrequency(str(text).split(' '), catholic_dict)
+        countFrequency(str(text).split(' '), jewish_dict)
+        countFrequency(str(text).split(' '), budism_dict)
 
     for word in islam_dict.keys():
         results["islam"]+=islam_dict[word]
