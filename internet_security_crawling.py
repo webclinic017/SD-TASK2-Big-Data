@@ -88,12 +88,11 @@ def merge_and_push_info(posts, tprofile, fprofile, path, storage):
 
 def do_predictions(posts):
     resultados = {}
-    results = political_analysis(posts)
-    political_pred=results[0]
-    resultados['political'] = results[1]
-    results = religion_analysis(posts)
-    resultados['religion'] = results[1]
-    religion_pred = results[0]
+    political_pred = political_analysis(posts)
+    resultados['political'] = political_pred
+    religion_pred = religion_analysis(posts)
+    resultados['religion'] = religion_pred
+    
     for post in posts:
         if(len(post) > 5):
             post[0] = political_pred
@@ -184,8 +183,8 @@ def profile_scoring(twitter_profile, facebook_profile):
             score+=5  
             if(len(twitter_profile[4]) > 0):
                 resultados['twlocation'] = str(twitter_profile[4])
-            else:
-                resultados['fblocation'] = str(facebook_profile[4])        #location
+            if(len(facebook_profile[4]) > 0):
+                    resultados['fblocation'] = str(facebook_profile[4])        #location        #location
         if("True" in str(twitter_profile[6])): 
             score+=10      
             resultados['public'] = str(twitter_profile[6])
@@ -247,7 +246,6 @@ def political_analysis(texts):
         else:
             result = "neutral"
     resultados['politics'] = result
-    hola=result
     return result
     
 def religion_analysis(texts):
