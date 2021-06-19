@@ -106,15 +106,23 @@ def write_csv_body(csv_content):
 
 
 def write_csv_posts(posts):
+    list_p = []
+    i = 2
+    for i in range(len(posts)):
+        list_p.append(posts[i][6])
+        i+=1
     output = io.StringIO()
-    w = csv.writer(output)
-    for post in posts:
-       k= post.split(',')
-       print(k)
-       if len(k)>5:
-           w.writerow([k[6]])
-    return output.getvalue()
+    w = csv.writer(output, delimiter='\n')
+    w.writerow(list_p)
+    return output.getvalue().encode('utf8')
 
+def split_posts_text(posts):
+    posts_split = []
+    for post in posts:
+        post_split = post.split(',')
+        if len(post_split)>4 and post_split[6] !='': 
+            posts_split.append(post_split)
+    return posts_split
 
 def cleaner(field):
     field = re.sub("@[A-Za-z0-9]+","",field) #Remove @ sign
@@ -139,11 +147,16 @@ def show_basic_statistics(df):
     print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
 
 def total_scoring(obj_id, storage):
-    
+    score = 0
     posts = storage.get_cloudobject(obj_id).decode('utf8')
-    posts=posts.split('\",\"')
-    posts=write_csv_posts(posts)
-    storage.put_cloudobject(posts,BUCKET_NAME, "dades.csv")
+    posts_split = split_posts_text(posts.split('%'))
+    output = write_csv_posts(posts_split)
+    storage.put_cloudobject(output,'sd-task2', 'dades.csv') #push data to notebook statistics
+    posts_split = split_posts_text(posts.split('%'))
+
+    score+=profile_scoring(posts_split[0], posts_split[1])
+    score=predictions_scoring(posts_split)
+    return score
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -158,8 +171,6 @@ def total_scoring(obj_id, storage):
 #     religion ideology not neutral-->+40 points
 def profile_scoring(twitter_profile, facebook_profile):
     score=0
-    twitter_profile = twitter_profile.split(',')
-    facebook_profile = facebook_profile.split(',')
     if(len(twitter_profile) > 8 or len(facebook_profile) > 8):
         if(len(twitter_profile[4]) > 0 or len(facebook_profile[4]) > 0): score+=5           #location
         if("True" in str(twitter_profile[6])): score+=10      #public profile
@@ -168,7 +179,6 @@ def profile_scoring(twitter_profile, facebook_profile):
 
 def predictions_scoring(post):
     score = -1
-    post = post.split(',')
     if(len(post) > 5):
         score =  0
         if(post[0] != "neutral"): score+=40   #politic
@@ -309,7 +319,7 @@ def do_security_analysis():
     fexec.wait()
     obj_id = fexec.get_result()
     fexec.map(total_scoring, obj_id)
-    return str(score)
+    return str(fexec.get_result())
 
 if __name__ == '__main__':
   app.run(debug=True) 
