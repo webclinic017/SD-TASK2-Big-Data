@@ -81,18 +81,24 @@ def twitter_posts_preprocessing(post):
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
-    posts = do_predictions(posts)
+    results = do_predictions(posts)
+    posts = results[0]
     id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"/data_crawling.csv")
-    return id
+    return id,results[1]
 
 def do_predictions(posts):
-    political_pred = political_analysis(posts)
-    religion_pred = religion_analysis(posts)
+    resultados = {}
+    results = political_analysis(posts)
+    political_pred=results[0]
+    resultados['political'] = results[1]
+    results = religion_analysis(posts)
+    resultados['religion'] = results[1]
+    religion_pred = results[0]
     for post in posts:
         if(len(post) > 5):
             post[0] = political_pred
             post[1] = religion_pred
-    return posts
+    return posts,resultados
 
 def write_csv_body(csv_content):
     output = io.StringIO()
@@ -153,10 +159,10 @@ def total_scoring(obj_id, path, storage):
     output = write_csv_posts(posts_split)
     storage.put_cloudobject(output,'sd-task2', path+"/filtred_posts.csv") #push data to notebook statistics
     posts_split = split_posts_text(posts.split('%'))
-
-    score+=profile_scoring(posts_split[0], posts_split[1])
+    results = profile_scoring(posts_split[0], posts_split[1])
+    score+=results[0]
     score+=predictions_scoring(posts_split[2])
-    return score
+    return score,results[1]
 
 ### Vulnerability Scoring (CVSS Score):
 #     0-39 -->Low
@@ -170,12 +176,23 @@ def total_scoring(obj_id, path, storage):
 #     political idelogy != neutral-->+40 points
 #     religion ideology not neutral-->+40 points
 def profile_scoring(twitter_profile, facebook_profile):
+    resultados = {}
     score=0
     if(len(twitter_profile) > 8 or len(facebook_profile) > 8):
-        if(len(twitter_profile[4]) > 0 or len(facebook_profile[4]) > 0): score+=5           #location
-        if("True" in str(twitter_profile[6])): score+=10      #public profile
-        if(("False" not in str(twitter_profile[7]))): score+=90     #geo enabled and the position is visible, twitter excl
-    return score
+        if(len(twitter_profile[4]) > 0 or len(facebook_profile[4]) > 0): 
+            score+=5  
+            if(len(twitter_profile[4]) > 0):
+                resultados['twlocation'] = str(twitter_profile[4])
+            else:
+                resultados['fblocation'] = str(facebook_profile[4])        #location
+        if("True" in str(twitter_profile[6])): 
+            score+=10      
+            resultados['public'] = str(twitter_profile[6])
+        if(("False" not in str(twitter_profile[7]))): 
+            score+=90
+            resultados['bothenabled'] = str(facebook_profile[7])        
+     #geo enabled and the position is visible, twitter excl
+    return score,resultados
 
 def predictions_scoring(post):
     score = -1
@@ -194,6 +211,8 @@ def countFrequency(my_list, freq):
     return freq
             
 def political_analysis(texts):
+    resultados = {}
+
     ###clarification: all keywords have been selected based on the frequency of their use, rather than personal opinions
     democrats_words = ["family", "care", "cut", "support", "thank", "new", "student", "need", "help", "equal pay", "fair", 
         "bin laden", "wall street", "worker", "veteran", "fight", "invest", "education", "military", "war", "medicare", "science", 
@@ -219,13 +238,16 @@ def political_analysis(texts):
         republican_freq+=republican_dict[word]
     
     if(democrat_freq>republican_freq):
-        return "democrat"
+        result= "democrat"
     else:
         if(democrat_freq<republican_freq):
-            return "republican"
+            result= "republican"
    
         else:
-            return "neutral"
+            result = "neutral"
+    resultados['politics'] = result
+    hola=result
+    return result
     
 def religion_analysis(texts):
     islam_words = ["allah", "fatwa", "hadj", "hajj","hijjah", "islam", "mecca", "muhammad", "mosque", "muslim", 
@@ -280,12 +302,17 @@ def religion_analysis(texts):
 
     max_value=max(results.items(), key=operator.itemgetter(1))[0]
     if (results.get(max_value) > 0):
-        return max_value
+        result= max_value
     else:
-        return "neutral"
+        result =  "neutral"
 
-@app.route('/do_security_analysis')
+    
+    return result
+
+@app.route('/do_security_analysis',methods = ['GET','POST'])
 def do_security_analysis():
+    resultados = {}
+
     registred_users = {}
     posts = []
     twitter_posts = []
@@ -293,6 +320,7 @@ def do_security_analysis():
     score = 0
     twitter_profile = list
     facebook_profile = list
+    results = {}
     #avatar = request.args.get('avatar')
     avatar="usi"
 
@@ -319,9 +347,17 @@ def do_security_analysis():
 
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
-    obj_id = fexec.get_result()
+    result = fexec.get_result()
+    obj_id=result[0]
+    resultados['relpol'] = result[1]
+
     fexec.map(total_scoring, (obj_id, path))
-    return str(fexec.get_result())
+    #resultados
+    result = fexec.get_result()
+    resultados['score'] = result[0]
+    return json.dumps(resultados)
+
+    
 
 if __name__ == '__main__':
   app.run(debug=True) 
