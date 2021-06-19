@@ -42,13 +42,13 @@ def facebook_profile_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,link,location']
     profile = graph.get_object(id="me",fields=field)
-    row = [cleaner(str(profile['id'])), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), cleaner(str(profile['link'])), 'null', 'null',
+    row = [str(profile['id']), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), cleaner(str(profile['link'])), 'null', 'null',
         "null"+"%"]
     return row
 
 def twitter_profile_crawler(twitter_screen_name):
     user = api.get_user(twitter_screen_name)
-    row = [cleaner(str(user.id_str)), cleaner(str(user.screen_name)), cleaner(str(user.name)), cleaner(str(user.created_at)), cleaner(str(user.location)), 
+    row = [str(user.id_str), cleaner(str(user.screen_name)), cleaner(str(user.name)), cleaner(str(user.created_at)), cleaner(str(user.location)), 
        cleaner(str(user.url)), cleaner(str(user.protected)), cleaner(str(user.geo_enabled)), cleaner(str(user.description))+"%"]
     return row
 
@@ -68,16 +68,16 @@ def facebook_posts_crawler(facebook_token):
     posts = []
     for post in profile['posts']['data']:
         if post.get('message'):
-            row = [" ", " ", cleaner(str(post.get('id'))), cleaner(str(profile.get('created_time'))), "null", "null", cleaner(str(post.get('message')))+"%"]
+            row = ["null", "null", str(post.get('id')), str(profile.get('created_time')), "null", "null", cleaner(str(post.get('message')))+"%"]
             posts.append(row)
     return posts
 
 def twitter_posts_preprocessing(post):
     row = []
     try:
-        row=[" ", " ", cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.full_text))+"%"]
+        row=["null", "null", str(post.id), str(post.created_at), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.full_text))+"%"]
     except:
-        row=[" ", " ", cleaner(str(post.id)), cleaner(str(post.created_at)), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.text))+"%"]
+        row=["null", "null", str(post.id), str(post.created_at), cleaner(str(post.geo)), cleaner(str(post.coordinates)), cleaner(str(post.text))+"%"]
     return row
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
@@ -291,6 +291,8 @@ def do_security_analysis():
     twitter_posts = []
     facebook_posts = []
     score = 0
+    twitter_profile = list
+    facebook_profile = list
     #avatar = request.args.get('avatar')
     avatar="usi"
 
@@ -301,7 +303,7 @@ def do_security_analysis():
     
     twitter_username = request.args.get('tname')
     facebook_token = request.args.get('fname')
-    if twitter_username is not None:
+    if twitter_username is not "":
         fexec.call_async(twitter_profile_crawler, twitter_username)
         fexec.wait()
         twitter_profile=fexec.get_result()
@@ -313,7 +315,7 @@ def do_security_analysis():
         facebook_profile = fexec.get_result()
         fexec.call_async(facebook_posts_crawler, facebook_token)
         facebook_posts = fexec.get_result()
-    posts = twitter_posts + facebook_posts
+        posts.append(facebook_posts)
 
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
