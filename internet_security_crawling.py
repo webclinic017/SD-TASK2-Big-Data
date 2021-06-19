@@ -82,7 +82,7 @@ def twitter_posts_preprocessing(post):
 
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     posts = do_predictions(posts)
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, "sd"+".csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"/data_crawling.csv")
     return id
 
 def do_predictions(posts):
@@ -146,12 +146,12 @@ def show_basic_statistics(df):
     print("Total length of the dataset is:", df.tweet_length.sum(), "chars")
     print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
 
-def total_scoring(obj_id, storage):
+def total_scoring(obj_id, path, storage):
     score = 0
     posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts_split = split_posts_text(posts.split('%'))
     output = write_csv_posts(posts_split)
-    storage.put_cloudobject(output,'sd-task2', 'dades.csv') #push data to notebook statistics
+    storage.put_cloudobject(output,'sd-task2', path+"/filtred_posts.csv") #push data to notebook statistics
     posts_split = split_posts_text(posts.split('%'))
 
     score+=profile_scoring(posts_split[0], posts_split[1])
@@ -300,7 +300,7 @@ def do_security_analysis():
         path = registred_users.get(avatar)
     else:
         path = registred_users[avatar] = str(uuid.uuid4())
-    
+    path = str(uuid.uuid4())
     twitter_username = request.args.get('tname')
     facebook_token = request.args.get('fname')
     if twitter_username is not "":
@@ -320,7 +320,7 @@ def do_security_analysis():
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
     obj_id = fexec.get_result()
-    fexec.map(total_scoring, obj_id)
+    fexec.map(total_scoring, (obj_id, path))
     return str(fexec.get_result())
 
 if __name__ == '__main__':
