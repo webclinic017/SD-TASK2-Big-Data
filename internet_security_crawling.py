@@ -42,14 +42,14 @@ def facebook_profile_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['id,name,link,location']
     profile = graph.get_object(id="me",fields=field)
-    row = [str(profile['id']), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), cleaner(str(profile['link'])), 'null', 'null',
+    row = [str(profile['id']), "null", cleaner(str(profile['name'])), "null", cleaner(str(profile['location']['name'])), profile['link'], 'null', 'null',
         "null"+"%"]
     return row
 
 def twitter_profile_crawler(twitter_screen_name):
     user = api.get_user(twitter_screen_name)
-    row = [str(user.id_str), cleaner(str(user.screen_name)), cleaner(str(user.name)), cleaner(str(user.created_at)), cleaner(str(user.location)), 
-       cleaner(str(user.url)), cleaner(str(user.protected)), cleaner(str(user.geo_enabled)), cleaner(str(user.description))+"%"]
+    row = [str(user.id_str), cleaner(str(user.screen_name)), cleaner(str(user.name)), str(user.created_at), cleaner(str(user.location)), 
+       "https://twitter.com/"+user.screen_name, str(user.protected), str(user.geo_enabled), cleaner(str(user.description))+"%"]
     return row
 
 def twitter_crawler_function(twitter_screen_name):
@@ -155,7 +155,7 @@ def total_scoring(obj_id, storage):
     posts_split = split_posts_text(posts.split('%'))
 
     score+=profile_scoring(posts_split[0], posts_split[1])
-    score=predictions_scoring(posts_split)
+    score+=predictions_scoring(posts_split[2])
     return score
 
 ### Vulnerability Scoring (CVSS Score):
@@ -181,8 +181,8 @@ def predictions_scoring(post):
     score = -1
     if(len(post) > 5):
         score =  0
-        if(post[0] != "neutral"): score+=40   #politic
-        if(post[1] != "neutral"): score+=40   #religion
+        if("neutral" not in post[0]): score+=40   #politic
+        if("neutral" not in post[1]): score+=40   #religion
     return score
    
 def countFrequency(my_list, freq):
