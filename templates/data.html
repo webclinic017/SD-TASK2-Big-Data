@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+  </head>
+  <body>
+  
+
+
+
+	<title>Data Page</title>
+   <!--Made with love by Mutiullah Samim -->
+   
+	<!--Bootsrap 4 CDN-->
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    
+    <!--Fontawesome CDN-->
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+
+	<!--Custom styles-->
+	<link rel="stylesheet" type="text/css" href="/templates/data.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="/templates/index.html">SocialAuth</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+        </li>
+    </div>
+  </nav>
+
+<div class="container">
+	<div class="d-flex justify-content-center h-100">
+		<div class="card">
+			<div class="card-header">
+				<h3>Prediction</h3>
+				
+                <table>
+                    <tr>
+                        {%for key in data['relpol']%}
+                            <th>{{key}}</th>
+                        {% endfor %}
+
+                        <th>score</th>
+
+                        {%for key in data['score'][1]%}
+                            <th>{{key}}</th>
+                        {% endfor %}
+    
+                        
+                       
+                    
+                    </tr>
+                        {%for key in data['relpol']%} 
+                            <td>{{data['relpol'][key]}}</td>
+                        {%endfor%}
+                        <td>{{data['score'][0]}}</td>
+                        {%for key in data['score'][1]%} 
+                        <td>{{data['score'][1][key]}}</td>
+                        {%endfor%}
+
+                    <tr>
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+   
+    
+  </body>
+</html>
