@@ -83,7 +83,7 @@ def twitter_posts_preprocessing(post):
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     results = do_predictions(posts)
     posts = results[0]
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"/data_crawling.csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"data_crawling.csv")
     return id,results[1]
 
 def do_predictions(posts):
@@ -104,7 +104,8 @@ def write_csv_body(csv_content):
     w = csv.writer(output)
     i=0
     for i in range(2):
-        w.writerow(csv_content[i])
+        if csv_content[i] is not None:
+            w.writerow(csv_content[i])
     for row in csv_content[2]:
         w.writerow(row)
     return output.getvalue().encode('utf8')
@@ -152,14 +153,14 @@ def show_basic_statistics(df):
     print("Total length of the dataset is:", df.tweet_length.sum(), "chars")
     print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
 
-def total_scoring(obj_id, path, storage):
+def total_scoring(obj_id, path, twitter_username, facebook_profile, storage):
     score = 0
     posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts_split = split_posts_text(posts.split('%'))
     output = write_csv_posts(posts_split)
     storage.put_cloudobject(output,'sd-task2', path+"/filtred_posts.csv") #push data to notebook statistics
     posts_split = split_posts_text(posts.split('%'))
-    results = profile_scoring(posts_split[0], posts_split[1])
+    results = profile_scoring(twitter_username, facebook_profile)
     score+=results[0]
     score+=predictions_scoring(posts_split[2])
     return score,results[1]
@@ -178,20 +179,21 @@ def total_scoring(obj_id, path, storage):
 def profile_scoring(twitter_profile, facebook_profile):
     resultados = {}
     score=0
-    if(len(twitter_profile) > 8 or len(facebook_profile) > 8):
-        if(len(twitter_profile[4]) > 0 or len(facebook_profile[4]) > 0): 
+    if(twitter_profile is not None):
+        if(twitter_profile is not None):
+            if(len(twitter_profile[4]) > 0):                        #location
+                score+=5  
+            if("True" in str(twitter_profile[6])):                  #protected
+                score+=10      
+            if(("False" not in str(twitter_profile[7]))):           #geo enabled and the position is visible, twitter excl
+                score+=90        
+            resultados['twlocation'] = str(twitter_profile[4])
+            resultados['public'] = str(twitter_profile[6])  
+            resultados['geo_enabled'] = str(twitter_profile[7])            
+    if(facebook_profile is not None):
+        if(len(facebook_profile[4]) > 0):                        #location
             score+=5  
-            if(len(twitter_profile[4]) > 0):
-                resultados['twlocation'] = str(twitter_profile[4])
-            if(len(facebook_profile[4]) > 0):
-                    resultados['fblocation'] = str(facebook_profile[4])        #location        #location
-        if("True" in str(twitter_profile[6])): 
-            score+=10      
-            resultados['public'] = str(twitter_profile[6])
-        if(("False" not in str(twitter_profile[7]))): 
-            score+=90
-            resultados['bothenabled'] = str(facebook_profile[7])        
-     #geo enabled and the position is visible, twitter excl
+        resultados['fblocation'] = str(facebook_profile[4])        #location
     return score,resultados
 
 def predictions_scoring(post):
@@ -337,12 +339,18 @@ def do_security_analysis():
         fexec.call_async(twitter_crawler_function, twitter_username)
         twitter_posts = fexec.get_result()
         posts.append(twitter_posts)
-    if facebook_token is not None:
+    if facebook_token is not "":
         fexec.call_async(facebook_profile_crawler, facebook_token)
+        fexec.wait()
         facebook_profile = fexec.get_result()
         fexec.call_async(facebook_posts_crawler, facebook_token)
         facebook_posts = fexec.get_result()
         posts.append(facebook_posts)
+    if(twitter_username is "" and facebook_token is not ""):
+        twitter_profile =  None
+    else:
+        if(facebook_token is "" and twitter_username is not ""):
+            facebook_profile = None
 
     fexec.call_async(merge_and_push_info, (posts, twitter_profile, facebook_profile, path))
     fexec.wait()
@@ -350,7 +358,7 @@ def do_security_analysis():
     obj_id=result[0]
     resultados['relpol'] = result[1]
 
-    fexec.map(total_scoring, (obj_id, path))
+    fexec.map(total_scoring, (obj_id, path, twitter_profile, facebook_profile))
     #resultados
     result = fexec.get_result()
     resultados['score'] = result[0]
