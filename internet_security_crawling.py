@@ -83,7 +83,7 @@ def twitter_posts_preprocessing(post):
 def merge_and_push_info(posts, tprofile, fprofile, path, storage):
     results = do_predictions(posts)
     posts = results[0]
-    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"data_crawling.csv")
+    id = storage.put_cloudobject(write_csv_body([tprofile,fprofile,posts]), BUCKET_NAME, path+"/data_crawling.csv")
     return id,results[1]
 
 def do_predictions(posts):
@@ -158,7 +158,7 @@ def total_scoring(obj_id, path, twitter_username, facebook_profile, storage):
     posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts_split = split_posts_text(posts.split('%'))
     output = write_csv_posts(posts_split)
-    storage.put_cloudobject(output,'sd-task2', path+"/filtred_posts.csv") #push data to notebook statistics
+    storage.put_cloudobject(output,BUCKET_NAME, path+"/filtred_posts.csv") #push data to notebook statistics
     posts_split = split_posts_text(posts.split('%'))
     results = profile_scoring(twitter_username, facebook_profile)
     score+=results[0]
@@ -306,8 +306,6 @@ def religion_analysis(texts):
         result= max_value
     else:
         result =  "neutral"
-
-    
     return result
 
 @app.route('/do_security_analysis',methods = ['GET','POST'])
