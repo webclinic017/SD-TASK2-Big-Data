@@ -32,7 +32,7 @@ auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
 auth.set_access_token(twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth)
 
-app = Flask(__name__)
+app = Flask(__name__,static_folder='templates',template_folder='templates')
 
 @app.route('/')
 def index():
@@ -354,7 +354,7 @@ def do_security_analysis():
     #resultados
     result = fexec.get_result()
     resultados['score'] = result[0]
-    return json.dumps(resultados)
+    return render_template("data.html",headings=resultados.keys(),data=resultados)
 
     
 
