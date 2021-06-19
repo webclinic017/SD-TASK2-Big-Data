@@ -139,6 +139,7 @@ def cleaner(field):
     field = field.strip()
     field = field.lower()
     field = field.replace('\r', '').replace('\n','')
+    field = field.replace('ñ', 'n')
     return field
 
 def show_basic_statistics(df):
