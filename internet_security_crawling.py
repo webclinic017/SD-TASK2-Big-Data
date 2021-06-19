@@ -142,17 +142,6 @@ def cleaner(field):
     field = field.replace('ñ', 'n')
     return field
 
-def show_basic_statistics(df):
-    count = df['posts_text'].str.split().str.len()
-    count.index = count.index.astype(str) + 'words:'
-    count.sort_index(inplace=True)
-    #Basic statistics
-    print("Total number of words", count.sum(), "words")
-    print("Mean number of words per tweet:", round(count.mean(),2), "words")
-    df["tweet_length"] = df["posts_text"].str.len()
-    print("Total length of the dataset is:", df.tweet_length.sum(), "chars")
-    print("Mean length of a tweet is: ", round(df.tweet_lenth.mean(),0), "chars")
-
 def total_scoring(obj_id, path, twitter_username, facebook_profile, storage):
     score = 0
     posts = storage.get_cloudobject(obj_id).decode('utf8')
