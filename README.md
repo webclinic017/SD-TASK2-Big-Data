@@ -48,19 +48,29 @@ Here you will need to insert a twitter username (For example, USA President's us
 
 And also you will need to insert a facebook token, which only can be your facebook token, this is because Facebook doesn't let you scrap profiles without their consent.
 
-For the facebook token, we have the blue Log In button. 
-
 
 For Logging in with facebook:
 
-Creating a new facebook app and adding your appId to our facebook index.html
-Or going to the [facebook graph explorer](https://developers.facebook.com/tools/explorer/) and generate a new token.
 
+Go to facebook and log in with this account:
+```bash
 Name	
 Jayden Alfihdhcgeajg Shepardson
 User ID	100069848375107
 Login email	hwerbzi_shepardson_1624193783@tfbnw.net
 Login password	yhynscexiip
+```
+
+Then go to the [facebook graph explorer](https://developers.facebook.com/tools/explorer/) and generate a new token.
+
+
+![alt text](https://i.imgur.com/xJ1Dat5.png)
+
+Insert the facebook token into the Facebook Token input.
+
+
+
+Then you are ready to submit.
 
 ```python
 import foobar
