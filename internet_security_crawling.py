@@ -300,7 +300,7 @@ def religion_analysis(texts):
 @app.route('/do_security_analysis',methods = ['GET','POST'])
 def do_security_analysis():
     resultados = {}
-
+    fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
     registred_users = {}
     posts = []
     twitter_posts = []
