@@ -2,9 +2,9 @@
 
 
 ## About
-This distributed application is designed to analayze the social media security of our users. They can analyze which is the personal information that they make public in their social media accounts. Specifically, they can analyze their Facebook and Twitter accounts. The objective is raise awareness among users that they can put a lot of personal information public, and this can be a risk because the hackers can use social engineering to condition their ideologies or decisions. Even thieves can take advantage of this information to find out where you live and rob your home if you are on holidays.
+This distributed application is designed to analayze the social media security of our users. Users can analyze which personal information is shared in their social media accounts. Moreover, they can analyze their Facebook and Twitter accounts. The objective is to raise awareness among users that they share a lot of personal information in public. This could be a risk because hackers can use social engineering to condition their ideologies or decisions. Even thieves can take advantage of this information to find out where users and find out personal information in order to commit a crime.
 
-This software implements serverless architecture and use IBM Cloud Functions to execute this app. Also, we used Lithops API to execute IBM Cloud Functions and store user's data in IBM Object Storage. Therefore, we use an object-oriented storage architecture.
+This software implements serverless architecture and the use of IBM Cloud Functions. Also, we used Lithops API to execute IBM Cloud Functions and store user's data in IBM Cloud Object Storage. Therefore, we use an object-oriented storage architecture.
 ## Installation
 
 
