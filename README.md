@@ -58,11 +58,10 @@ For Logging in with facebook:
 Go to the [facebook graph explorer](https://developers.facebook.com/tools/explorer/) and generate a new token. Then log in with this account:
 
 ```bash
-Name	
-Jayden Alfihdhcgeajg Shepardson
-User ID	100069848375107
-Login email	hwerbzi_shepardson_1624193783@tfbnw.net
-Login password	yhynscexiip
+Name	Sheldon Cooper
+Login email	sdtest808@gmail.com
+Login password	@@@@test
+
 ```
 
 
