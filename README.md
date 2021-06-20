@@ -52,7 +52,10 @@ And also you will need to insert a facebook token, which only can be your facebo
 For Logging in with facebook:
 
 
-Go to facebook and log in with this account:
+
+
+Go to the [facebook graph explorer](https://developers.facebook.com/tools/explorer/) and generate a new token. Then log in with this account:
+
 ```bash
 Name	
 Jayden Alfihdhcgeajg Shepardson
@@ -60,8 +63,6 @@ User ID	100069848375107
 Login email	hwerbzi_shepardson_1624193783@tfbnw.net
 Login password	yhynscexiip
 ```
-
-Then go to the [facebook graph explorer](https://developers.facebook.com/tools/explorer/) and generate a new token.
 
 
 ![alt text](https://i.imgur.com/xJ1Dat5.png)
@@ -72,13 +73,11 @@ Insert the facebook token into the Facebook Token input.
 
 Then you are ready to submit.
 
-```python
-import foobar
+Once you submit, you will get the resoults in this format:
 
-foobar.pluralize('word') # returns 'words'
-foobar.pluralize('goose') # returns 'geese'
-foobar.singularize('phenomena') # returns 'phenomenon'
-```
+![alt text](https://i.imgur.com/rU2gzFk.png)
+
+
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
