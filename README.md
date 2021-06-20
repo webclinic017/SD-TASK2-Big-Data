@@ -37,7 +37,7 @@ Start the webserver using:
 python internet_security_crawling.py
 ```
 
-Once the webserver has started, you have access to the frontend.
+Once the webserver has started, you have access to the frontend on localhost:5000.
 
 You will be greeted with this screen: 
 
