@@ -9,6 +9,7 @@ import redis
 import json
 from lithops.storage import Storage
 from lithops.serverless import ServerlessHandler
+from lithops.multiprocessing import Pool
 import io
 from hashlib import md5
 import uuid
@@ -18,13 +19,14 @@ import pandas as pd
 import re
 import numpy as np
 import string
+import time
 
 BUCKET_NAME='sd-task2'
 fexec = lithops.FunctionExecutor(backend='ibm_cf', runtime='usipiton/lithops-custom1-runtime-3.9:0.1')
-twitter_consumer_key = "HULJLDcth2DlyCeQetSVImh0S"
-twitter_consumer_secret = "UVPSLbfTudhGa4j1MlsmDA6KxXJUeY7mqGQkprdsHJD1rFcJH6"
-twitter_access_token = "1313145032-gdwPOWniKGX9jbOwlUs1fqqJuDfLzue17FdNDUD"
-twitter_access_token_secret = "s5YDPEylUR9hWuuNIXNIRmgTXoVkBKFwavxke2u8O49pi"
+twitter_consumer_key = "Y1arAlcMTrawv42ZwWuSqFUTW"
+twitter_consumer_secret = "fvWM5wfBwLMsqpyEnR7Z11Ibmnz2f7b22l5W9lBKnGijOENBjM"
+twitter_access_token = "1406691788937641984-XZlryeI3dYeMMkyECXViPEE4nB9ooO"
+twitter_access_token_secret = "m1fAYLy85Z4720R4rTF3X0gL7OarJjRkvoWgxRV90kzM5"
 
 posts_header = ["political_analysis", "religion_analysis", "coordinates", "post_id", "post_created_at", "post_text"]
 profile_header = ["id", "user_name", "name", "account_created_at", "location", "URL", "protected", "geo_enabled", "description"]
@@ -53,14 +55,25 @@ def twitter_profile_crawler(twitter_screen_name):
     return row
 
 def twitter_crawler_function(twitter_screen_name):
-    posts=[]
-    for post in api.user_timeline(screen_name=twitter_screen_name, count=200, include_rts = False, tweet_mode = 'extended'):
-        posts.append(post)
-    lista=[]
+    fexec = lithops.FunctionExecutor()
+    lista = []
+    user = api.get_user(twitter_screen_name)
+    lista+=get_user_posts(user)
+    #followers
+    ids = []
+    friends = tweepy.Cursor(api.friends, twitter_screen_name).items(30)
+    with Pool() as pool:
+        lista+= pool.map(get_user_posts, friends)
+    return lista
+
+def get_user_posts(user):
+    lista = []
+    user = api.get_user(user.screen_name)
+    posts = api.user_timeline(screen_name=user.screen_name, count=200, include_rts = False, tweet_mode = 'extended')
     for post in posts:
         lista.append(twitter_posts_preprocessing(post))
     return lista
-
+    
 def facebook_posts_crawler(facebook_token):
     graph = facebook.GraphAPI(facebook_token)
     field = ['posts']
@@ -147,7 +160,7 @@ def total_scoring(obj_id, path, twitter_username, facebook_profile, storage):
     posts = storage.get_cloudobject(obj_id).decode('utf8')
     posts_split = split_posts_text(posts.split('%'))
     output = write_csv_posts(posts_split)
-    storage.put_cloudobject(output,BUCKET_NAME, path+"/filtred_posts.csv") #push data to notebook statistics
+    storage.put_cloudobject(output,BUCKET_NAME, path+"filtred_posts.csv") #push data to notebook statistics
     posts_split = split_posts_text(posts.split('%'))
     results = profile_scoring(twitter_username, facebook_profile)
     score+=results[0]
