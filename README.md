@@ -2,8 +2,9 @@
 
 
 ## About
-The focus of this project is to predict two topics from a Facebook/Twitter profile; religion and political opinion.
+This distributed application is designed to analayze the social media security of our users. Users can analyze which personal information is shared in their social media accounts. Moreover, they can analyze their Facebook and Twitter accounts. The objective is to raise awareness among users that they share a lot of personal information in public. This could be a risk because hackers can use social engineering to condition their ideologies or decisions. Even thieves can take advantage of this information to find out where users and find out personal information in order to commit a crime.
 
+This software implements serverless architecture and the use of IBM Cloud Functions. Also, we used Lithops API to execute IBM Cloud Functions and store user's data in IBM Cloud Object Storage. Therefore, we use an object-oriented storage architecture.
 ## Installation
 
 
